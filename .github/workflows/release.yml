@@ -31,7 +31,9 @@ jobs:
       - id: metadata
         name: Verify semantic version
         shell: bash
-        run: echo "version=$(npm run --silent verify:release-version -- \"$GITHUB_REF_NAME\")" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(npm run --silent verify:release-version -- "$GITHUB_REF_NAME")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Require a commit from main
         shell: bash
         run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main

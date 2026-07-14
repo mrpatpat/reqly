@@ -40,7 +40,9 @@ jobs:
       - id: metadata
         name: Read extension version
         shell: bash
-        run: echo "version=$(node -p \"require('./packages/vscode/package.json').version\")" >> "$GITHUB_OUTPUT"
+        run: |
+          version=$(node -p "require('./packages/vscode/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - run: npm run package:vscode
       - name: Name release artifact
         run: mv reqly.vsix "reqly-vscode-${{ steps.metadata.outputs.version }}.vsix"
@@ -50,4 +52,3 @@ jobs:
           path: reqly-vscode-${{ steps.metadata.outputs.version }}.vsix
           if-no-files-found: error
           retention-days: 14
-
