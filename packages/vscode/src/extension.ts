@@ -21,18 +21,29 @@ import {
 } from "@reqly/core";
 
 interface ImpactEntry { record: ReqlyRecord; relatedId?: string; message: string; }
+type ItemColor = "green" | "red" | "blue";
 
 class ItemNode extends vscode.TreeItem {
-  constructor(public readonly record: ReqlyRecord, health: string[] = [], verified?: boolean, public readonly lineage: string[] = [], collapsible = false) {
+  constructor(public readonly record: ReqlyRecord, health: string[] = [], verified?: boolean, color?: ItemColor, public readonly lineage: string[] = [], collapsible = false) {
     super(record.data.title, collapsible ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
     const verificationLabel = record.type === "requirement" ? verified === true ? "verified" : verified === false ? "failed" : "verification incomplete" : "";
-    this.description = `${record.status}${verificationLabel ? ` · ${verificationLabel}` : ""}${health.length ? ` · ${health.join(", ")}` : ""}`;
-    this.tooltip = `${record.data.id}\n${record.data.title}\n${this.description}`;
+    this.tooltip = `${record.data.id}\n${record.data.title}\n${record.status}${verificationLabel ? ` · ${verificationLabel}` : ""}${health.length ? ` · ${health.join(", ")}` : ""}`;
     this.contextValue = record.type === "requirement" ? "reqlyRequirement" : "reqlyItem";
-    const result = record.type === "verification" ? record.status === "pass" ? true : record.status === "fail" ? false : undefined : verified;
-    this.iconPath = result === true ? new vscode.ThemeIcon("check", new vscode.ThemeColor("testing.iconPassed")) : result === false ? new vscode.ThemeIcon("close", new vscode.ThemeColor("testing.iconFailed")) : new vscode.ThemeIcon("symbol-interface");
+    this.iconPath = itemIcon(record, color ?? ownItemColor(record, verified));
     this.command = { command: "reqly.openItem", title: "Open Item", arguments: [this] };
   }
+}
+
+function ownItemColor(record: ReqlyRecord, verified?: boolean): ItemColor {
+  if (record.type === "verification") return record.status === "pass" ? "green" : record.status === "fail" ? "red" : "blue";
+  if (record.status === "draft") return verified === true ? "green" : verified === false ? "red" : "blue";
+  return verified === true ? "green" : verified === false ? "red" : "blue";
+}
+
+function itemIcon(record: ReqlyRecord, color: ItemColor): vscode.ThemeIcon {
+  const colorId = color === "green" ? "testing.iconPassed" : color === "red" ? "testing.iconFailed" : "charts.blue";
+  if (record.type === "verification") return record.status === "pass" ? new vscode.ThemeIcon("check", new vscode.ThemeColor("testing.iconPassed")) : record.status === "fail" ? new vscode.ThemeIcon("close", new vscode.ThemeColor("testing.iconFailed")) : new vscode.ThemeIcon("symbol-interface");
+  return new vscode.ThemeIcon(record.status === "draft" ? "edit" : "file", new vscode.ThemeColor(colorId));
 }
 
 class ImpactNode extends vscode.TreeItem {
@@ -55,20 +66,29 @@ class RequirementsProvider implements vscode.TreeDataProvider<ItemNode> {
   getTreeItem(item: ItemNode): vscode.TreeItem { return item; }
   getChildren(element?: ItemNode): ItemNode[] {
     if (!this.repository) return [];
+    const repository = this.repository;
     const records = [...this.repository.records.values()];
-    const isHierarchyRelation = (relation: Relation) => this.repository?.config.relations[relation.type]?.acyclic === true;
+    const isHierarchyRelation = (relation: Relation) => repository.config.relations[relation.type]?.acyclic === true;
     const childrenOf = (id: string) => {
-      const parent = this.repository?.records.get(id);
+      const parent = repository.records.get(id);
       const requirementChildren = records.filter((record) => record.type === "requirement" && (record.data.relations ?? []).some((relation) => isHierarchyRelation(relation) && relation.target === id));
       const verificationChildren = parent?.type === "requirement" ? (parent.data.relations ?? []).flatMap((relation) => {
-        const definition = this.repository?.config.relations[relation.type]; const target = this.repository?.records.get(relation.target);
+        const definition = repository.config.relations[relation.type]; const target = repository.records.get(relation.target);
         return definition?.source === "requirement" && definition.target === "verification" && target ? [target] : [];
       }) : [];
       return [...requirementChildren, ...verificationChildren];
     };
     const hasTreeParent = (record: ReqlyRecord) => record.type === "requirement"
-      ? (record.data.relations ?? []).some((relation) => isHierarchyRelation(relation) && this.repository?.records.has(relation.target))
-      : records.some((candidate) => candidate.type === "requirement" && (candidate.data.relations ?? []).some((relation) => this.repository?.config.relations[relation.type]?.target === "verification" && relation.target === record.data.id));
+      ? (record.data.relations ?? []).some((relation) => isHierarchyRelation(relation) && repository.records.has(relation.target))
+      : records.some((candidate) => candidate.type === "requirement" && (candidate.data.relations ?? []).some((relation) => repository.config.relations[relation.type]?.target === "verification" && relation.target === record.data.id));
+    const colorFor = (record: ReqlyRecord, visiting = new Set<string>()): ItemColor => {
+      const own = ownItemColor(record, record.type === "requirement" ? repository.verificationState(record.data.id) : undefined);
+      if (visiting.has(record.data.id)) return own;
+      const childColors = childrenOf(record.data.id).map((child) => colorFor(child, new Set(visiting).add(record.data.id)));
+      if (childColors.includes("blue")) return "blue";
+      if (childColors.includes("red")) return "red";
+      return childColors.length ? "green" : own;
+    };
     let candidates: ReqlyRecord[]; let lineage: string[];
     if (element) {
       lineage = [...element.lineage, element.record.data.id];
@@ -82,7 +102,7 @@ class RequirementsProvider implements vscode.TreeDataProvider<ItemNode> {
     }
     return [...new Map(candidates.map((record) => [record.data.id, record])).values()]
       .sort((a, b) => a.data.id.localeCompare(b.data.id))
-      .map((record) => new ItemNode(record, (this.statuses.get(record.data.id)?.health ?? []).filter((value) => value !== "clean"), this.repository?.verificationState(record.data.id), lineage, childrenOf(record.data.id).some((child) => !lineage.includes(child.data.id))));
+      .map((record) => new ItemNode(record, (this.statuses.get(record.data.id)?.health ?? []).filter((value) => value !== "clean"), repository.verificationState(record.data.id), colorFor(record), lineage, childrenOf(record.data.id).some((child) => !lineage.includes(child.data.id))));
   }
 }
 
