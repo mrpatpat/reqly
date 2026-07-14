@@ -4,7 +4,8 @@
 
 Reqly is an npm-workspace TypeScript project for a Git-native requirements and traceability VS Code extension.
 
-- `packages/core` is the extension's private implementation library for formats, schemas, Git behavior, validation, and mutations.
+- `packages/core` is the publishable implementation library for formats, schemas, Git behavior, validation, and mutations.
+- `packages/mcp` is the universal stdio MCP server for external AI agents.
 - `packages/vscode` contains the VS Code extension and requirement explorer.
 
 Keep Markdown and YAML files as the source of truth. Caches and build output must remain disposable projections.

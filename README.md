@@ -1,6 +1,6 @@
 # Reqly
 
-Reqly is a VS Code extension for requirements, verification, and traceability in Git repositories. It keeps the source of truth in ordinary Markdown files with YAML frontmatter, so the records are reviewable, diffable, and easy to keep with the product code.
+Reqly is a VS Code extension and MCP server for requirements, verification, and traceability in Git repositories. It keeps the source of truth in ordinary Markdown files with YAML frontmatter, so the records are reviewable, diffable, and easy to keep with the product code.
 
 ## Try it with one feature
 
@@ -102,3 +102,15 @@ npm run build
 ```
 
 Extension changes should also pass `npm run package:vscode`.
+
+### Agent integrations
+
+Reqly's universal agent interface is the standalone `@reqly/mcp` package. It runs as a local stdio MCP server and works with Codex, Claude, Cursor, and other MCP clients:
+
+```toml
+[mcp_servers.reqly]
+command = "npx"
+args = ["-y", "@reqly/mcp"]
+```
+
+The server uses the current working directory as the Reqly repository. Set `REQLY_ROOT` when the repository is elsewhere.
