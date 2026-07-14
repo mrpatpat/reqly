@@ -103,6 +103,12 @@ npm run build
 
 Extension changes should also pass `npm run package:vscode`.
 
+### Automated releases
+
+Pushes to `main` run semantic-release after CI passes. A releasable Conventional Commit updates the package versions, builds the VSIX, publishes the core and MCP packages to npm, publishes the VS Code extension to the Marketplace, and creates a GitHub release.
+
+To enable Marketplace publishing, create a Microsoft Entra ID or Azure DevOps personal access token with Marketplace **Manage** permission and add it as the `VSCE_PAT` secret in the `github-release` environment. The token's publisher must be `mrpatpat`, matching `packages/vscode/package.json`.
+
 ### Agent integrations
 
 Reqly's universal agent interface is the standalone `@mrpatpat/reqly-mcp` package. It runs as a local stdio MCP server and works with Codex, Claude, Cursor, and other MCP clients:
