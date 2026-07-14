@@ -25,7 +25,6 @@ jobs:
         run: npm run release
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
       - name: Attest VSIX provenance
         if: ${{ hashFiles('release/*.vsix') != '' }}
         uses: actions/attest@v4
