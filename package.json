@@ -1,0 +1,26 @@
+{
+  "name": "reqly-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Git-native product requirements, verification, and traceability",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @reqly/core && npm run build -w @reqly/cli && npm run build -w @reqly/mcp && npm run build -w reqly-vscode",
+    "check": "npm run build -w @reqly/core && npm run check -w @reqly/core && npm run check -w @reqly/cli && npm run check -w @reqly/mcp && npm run check -w reqly-vscode",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package:vscode": "npm run build && cd packages/vscode && npx @vscode/vsce package --no-dependencies --allow-missing-repository --out ../../reqly.vsix",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

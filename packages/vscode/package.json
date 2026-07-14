@@ -1,0 +1,85 @@
+{
+  "name": "reqly-vscode",
+  "displayName": "Reqly",
+  "description": "Git-native product requirements, verification, and traceability",
+  "version": "0.1.0",
+  "publisher": "reqly",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dist/**",
+    "media/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/extension.cjs",
+  "engines": {
+    "vscode": "^1.107.0"
+  },
+  "categories": ["Other", "Visualization"],
+  "activationEvents": ["workspaceContains:.reqly/AGENTS.md"],
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "@reqly/core": "0.1.0",
+    "cytoscape": "^3.33.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/cytoscape": "^3.21.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/vscode": "1.107.0",
+    "esbuild": "^0.25.0"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [{ "id": "reqly", "title": "Reqly", "icon": "media/reqly.svg" }]
+    },
+    "views": {
+      "reqly": [
+        { "id": "reqly.requirements", "name": "Requirements" },
+        { "id": "reqly.impacts", "name": "Impact Queue" }
+      ]
+    },
+    "viewsWelcome": [{
+      "view": "reqly.requirements",
+      "contents": "No Reqly project is open.\n[Initialize Reqly](command:reqly.init)"
+    }],
+    "commands": [
+      { "command": "reqly.init", "title": "Reqly: Initialize Project" },
+      { "command": "reqly.refresh", "title": "Reqly: Refresh" },
+      { "command": "reqly.newRequirement", "title": "Reqly: New Requirement" },
+      { "command": "reqly.newVerification", "title": "Reqly: New Verification" },
+      { "command": "reqly.validate", "title": "Reqly: Validate Project" },
+      { "command": "reqly.openGraph", "title": "Reqly: Open Requirement Graph" },
+      { "command": "reqly.openItem", "title": "Reqly: Open Item" },
+      { "command": "reqly.previewItem", "title": "Reqly: Preview Markdown" },
+      { "command": "reqly.setStatus", "title": "Reqly: Change Status" },
+      { "command": "reqly.manageRelations", "title": "Reqly: Manage Relations" },
+      { "command": "reqly.manageArtifacts", "title": "Reqly: Manage Artifacts" },
+      { "command": "reqly.deleteItem", "title": "Reqly: Delete Item" },
+      { "command": "reqly.acknowledgeImpact", "title": "Reqly: Acknowledge Related Change" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "reqly.newRequirement", "when": "view == reqly.requirements", "group": "navigation" },
+        { "command": "reqly.newVerification", "when": "view == reqly.requirements", "group": "navigation" },
+        { "command": "reqly.openGraph", "when": "view == reqly.requirements", "group": "navigation" },
+        { "command": "reqly.refresh", "when": "view =~ /reqly\\./", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "reqly.previewItem", "when": "viewItem == reqlyItem", "group": "inline" },
+        { "command": "reqly.setStatus", "when": "viewItem == reqlyItem", "group": "reqly" },
+        { "command": "reqly.manageRelations", "when": "viewItem == reqlyItem", "group": "reqly" },
+        { "command": "reqly.manageArtifacts", "when": "viewItem == reqlyItem", "group": "reqly" },
+        { "command": "reqly.deleteItem", "when": "viewItem == reqlyItem", "group": "reqly" },
+        { "command": "reqly.acknowledgeImpact", "when": "viewItem == reqlyImpactAcknowledgeable", "group": "reqly" }
+      ]
+    }
+  }
+}
