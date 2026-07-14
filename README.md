@@ -30,23 +30,18 @@ Create a local extension package with `npm run package:vscode`.
 
 ## VS Code extension releases
 
-The VS Code extension follows stable [Semantic Versioning](https://semver.org/). Core, CLI, and MCP packages are not published. Pull requests and `main` are tested on Linux and Windows, and CI retains a packaged VSIX artifact for 14 days.
+The VS Code extension is released automatically from `main` using [Conventional Commits](https://www.conventionalcommits.org/) and [Semantic Versioning](https://semver.org/). Core, CLI, and MCP packages are not published. Pull requests and `main` are tested on Linux and Windows, and CI retains a packaged VSIX artifact for 14 days.
 
-Choose the version increment based on extension compatibility:
+Pull request titles must use Conventional Commits syntax. When changes are squash-merged, the title becomes the commit analyzed by `semantic-release`:
 
-- Patch for backwards-compatible fixes: `npm run version:vscode:patch`
-- Minor for backwards-compatible functionality: `npm run version:vscode:minor`
-- Major for breaking changes: `npm run version:vscode:major`
+- `fix: correct artifact cleanup` creates a patch release.
+- `feat: add verification filtering` creates a minor release.
+- `feat!: change the requirement schema` creates a major release.
+- `docs:`, `test:`, `ci:`, `chore:`, and similar maintenance commits create no release.
 
-Commit the resulting `packages/vscode/package.json` and `package-lock.json` changes. After that commit reaches `main`, create and push an annotated tag matching the manifest exactly:
+Versions are calculated exclusively from commits since the previous release, starting from the existing `v0.1.0` baseline. Do not edit the extension version or create release tags manually: during the release job, Reqly stamps the calculated version into the packaged extension without committing generated version changes.
 
-```sh
-npm run verify:release-version -- v0.2.0
-git tag -a v0.2.0 -m "Reqly 0.2.0"
-git push origin v0.2.0
-```
-
-The tag must use `vMAJOR.MINOR.PATCH` without prerelease or build metadata and must point to a commit contained in `main`. GitHub Actions rebuilds and tests the repository, packages `reqly-vscode-MAJOR.MINOR.PATCH.vsix`, creates a SHA-256 checksum and provenance attestation, and creates or updates the corresponding GitHub Release. Marketplace publication is intentionally not part of this workflow. The release job uses the `github-release` GitHub environment so approval or tag restrictions can be added in the repository settings without changing the workflow.
+After all CI jobs succeed on a push to `main`, `semantic-release` analyzes the commits. If a release is required, it creates `vMAJOR.MINOR.PATCH`, packages `reqly-vscode-MAJOR.MINOR.PATCH.vsix`, creates a SHA-256 checksum and provenance attestation, and publishes the GitHub Release with generated notes. The release job uses the `github-release` GitHub environment. Marketplace publication remains intentionally excluded.
 
 ## Start a project
 
