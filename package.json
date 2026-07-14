@@ -12,18 +12,21 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "package:vscode": "npm run build && cd packages/vscode && npx @vscode/vsce package --no-dependencies --allow-missing-repository --out ../../reqly.vsix",
-    "verify:release-version": "node scripts/verify-release-version.mjs",
-    "version:vscode:patch": "npm version patch --workspace reqly-vscode --no-git-tag-version",
-    "version:vscode:minor": "npm version minor --workspace reqly-vscode --no-git-tag-version",
-    "version:vscode:major": "npm version major --workspace reqly-vscode --no-git-tag-version",
+    "release": "semantic-release",
     "clean": "npm run clean --workspaces --if-present"
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
+    "@semantic-release/commit-analyzer": "13.0.1",
+    "@semantic-release/exec": "7.1.0",
+    "@semantic-release/github": "12.0.9",
+    "@semantic-release/release-notes-generator": "14.1.1",
     "@types/node": "^24.0.0",
     "@vscode/vsce": "^3.6.0",
+    "conventional-changelog-conventionalcommits": "10.2.1",
+    "semantic-release": "25.0.7",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
   }
