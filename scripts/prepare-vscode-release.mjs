@@ -16,11 +16,24 @@ const run = (args) => {
   execFileSync(command, commandArguments, { cwd: root, stdio: "inherit" });
 };
 
-run(["version", version, "--workspace", "reqly-vscode", "--no-git-tag-version", "--allow-same-version"]);
-run(["version", version, "--workspace", "@mrpatpat/reqly-core", "--no-git-tag-version", "--allow-same-version"]);
-run(["version", version, "--workspace", "@mrpatpat/reqly-mcp", "--no-git-tag-version", "--allow-same-version"]);
-run(["pkg", "set", `dependencies.@mrpatpat/reqly-core=${version}`, "--workspace", "@mrpatpat/reqly-mcp"]);
-run(["install", "--package-lock-only"]);
+const updatePackage = async (relativePath, update) => {
+  const file = path.join(root, relativePath);
+  const packageJson = JSON.parse(await readFile(file, "utf8"));
+  update(packageJson);
+  await writeFile(file, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
+};
+
+await updatePackage("packages/vscode/package.json", (packageJson) => {
+  packageJson.version = version;
+  packageJson.dependencies["@mrpatpat/reqly-core"] = version;
+});
+await updatePackage("packages/core/package.json", (packageJson) => {
+  packageJson.version = version;
+});
+await updatePackage("packages/mcp/package.json", (packageJson) => {
+  packageJson.version = version;
+  packageJson.dependencies["@mrpatpat/reqly-core"] = version;
+});
 run(["run", "package:vscode"]);
 
 const outputDirectory = path.join(root, "release");
