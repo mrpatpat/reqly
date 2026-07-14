@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+
+  package:
+    name: Package VS Code extension
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - id: metadata
+        name: Read extension version
+        shell: bash
+        run: echo "version=$(node -p \"require('./packages/vscode/package.json').version\")" >> "$GITHUB_OUTPUT"
+      - run: npm run package:vscode
+      - name: Name release artifact
+        run: mv reqly.vsix "reqly-vscode-${{ steps.metadata.outputs.version }}.vsix"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: reqly-vscode-${{ steps.metadata.outputs.version }}
+          path: reqly-vscode-${{ steps.metadata.outputs.version }}.vsix
+          if-no-files-found: error
+          retention-days: 14
+

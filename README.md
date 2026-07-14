@@ -28,6 +28,26 @@ npm run build
 
 Create a local extension package with `npm run package:vscode`.
 
+## VS Code extension releases
+
+The VS Code extension follows stable [Semantic Versioning](https://semver.org/). Core, CLI, and MCP packages are not published. Pull requests and `main` are tested on Linux and Windows, and CI retains a packaged VSIX artifact for 14 days.
+
+Choose the version increment based on extension compatibility:
+
+- Patch for backwards-compatible fixes: `npm run version:vscode:patch`
+- Minor for backwards-compatible functionality: `npm run version:vscode:minor`
+- Major for breaking changes: `npm run version:vscode:major`
+
+Commit the resulting `packages/vscode/package.json` and `package-lock.json` changes. After that commit reaches `main`, create and push an annotated tag matching the manifest exactly:
+
+```sh
+npm run verify:release-version -- v0.2.0
+git tag -a v0.2.0 -m "Reqly 0.2.0"
+git push origin v0.2.0
+```
+
+The tag must use `vMAJOR.MINOR.PATCH` without prerelease or build metadata and must point to a commit contained in `main`. GitHub Actions rebuilds and tests the repository, packages `reqly-vscode-MAJOR.MINOR.PATCH.vsix`, creates a SHA-256 checksum and provenance attestation, and creates or updates the corresponding GitHub Release. Marketplace publication is intentionally not part of this workflow. The release job uses the `github-release` GitHub environment so approval or tag restrictions can be added in the repository settings without changing the workflow.
+
 ## Start a project
 
 ```sh
