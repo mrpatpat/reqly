@@ -110,11 +110,10 @@ async function validateArtifact(repository: ReqlyRepository, record: ReqlyRecord
   }
   try {
     const normalized = relative.replaceAll("\\", "/");
-    const size = repository.revision ? await repository.git.objectSize(repository.revision, normalized) : (await stat(resolved)).size;
-    if (size === null) throw new Error("Missing historical artifact");
-    if (!repository.revision) await access(resolved);
+    const size = (await stat(resolved)).size;
+    await access(resolved);
     if (size > repository.config.artifacts.lfsWarningBytes) {
-      const filter = await repository.git.lfsFilter(normalized, repository.revision ?? undefined);
+      const filter = await repository.git.lfsFilter(normalized);
       if (filter !== "lfs") diagnostics.push(diagnostic(record, "LARGE_FILE_NOT_LFS", "warning", `${target} is larger than the configured threshold and is not tracked by Git LFS.`));
     }
   } catch {
