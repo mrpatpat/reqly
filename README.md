@@ -105,12 +105,12 @@ Extension changes should also pass `npm run package:vscode`.
 
 ### Agent integrations
 
-Reqly's universal agent interface is the standalone `@reqly/mcp` package. It runs as a local stdio MCP server and works with Codex, Claude, Cursor, and other MCP clients:
+Reqly's universal agent interface is the standalone `@mrpatpat/reqly-mcp` package. It runs as a local stdio MCP server and works with Codex, Claude, Cursor, and other MCP clients:
 
 ```toml
 [mcp_servers.reqly]
 command = "npx"
-args = ["-y", "@reqly/mcp"]
+args = ["-y", "@mrpatpat/reqly-mcp"]
 ```
 
 The server uses the current working directory as the Reqly repository. Set `REQLY_ROOT` when the repository is elsewhere.

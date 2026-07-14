@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createItem, createVerification, setRelation, setStatus, validateRepository } from "@reqly/core";
-import { ReqlyRepository } from "@reqly/core";
+import { createItem, createVerification, setRelation, setStatus, validateRepository } from "@mrpatpat/reqly-core";
+import { ReqlyRepository } from "@mrpatpat/reqly-core";
 import * as z from "zod";
 
 const server = new McpServer({ name: "reqly", version: "0.1.0" });

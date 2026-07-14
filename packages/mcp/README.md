@@ -1,4 +1,4 @@
-# @reqly/mcp
+# @mrpatpat/reqly-mcp
 
 Universal MCP server for Reqly. It exposes requirements, verifications, validation, status changes, and relation mutations over stdio, so Codex, Claude, Cursor, and other MCP clients can use Reqly without VS Code.
 
@@ -9,5 +9,5 @@ Example Codex configuration:
 ```toml
 [mcp_servers.reqly]
 command = "npx"
-args = ["-y", "@reqly/mcp"]
+args = ["-y", "@mrpatpat/reqly-mcp"]
 ```

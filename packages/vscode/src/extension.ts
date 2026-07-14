@@ -18,7 +18,7 @@ import {
   type ItemStatus,
   type Relation,
   type ReqlyRecord,
-} from "@reqly/core";
+} from "@mrpatpat/reqly-core";
 
 interface ImpactEntry { record: ReqlyRecord; relatedId?: string; message: string; }
 type ItemColor = "green" | "red" | "blue";

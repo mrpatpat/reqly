@@ -32,7 +32,7 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@reqly/core": "0.1.0"
+    "@mrpatpat/reqly-core": "0.1.0"
   },
   "devDependencies": {
     "@types/vscode": "1.107.0",

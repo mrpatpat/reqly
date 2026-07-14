@@ -17,9 +17,9 @@ const run = (args) => {
 };
 
 run(["version", version, "--workspace", "reqly-vscode", "--no-git-tag-version", "--allow-same-version"]);
-run(["version", version, "--workspace", "@reqly/core", "--no-git-tag-version", "--allow-same-version"]);
-run(["version", version, "--workspace", "@reqly/mcp", "--no-git-tag-version", "--allow-same-version"]);
-run(["pkg", "set", `dependencies.@reqly/core=${version}`, "--workspace", "@reqly/mcp"]);
+run(["version", version, "--workspace", "@mrpatpat/reqly-core", "--no-git-tag-version", "--allow-same-version"]);
+run(["version", version, "--workspace", "@mrpatpat/reqly-mcp", "--no-git-tag-version", "--allow-same-version"]);
+run(["pkg", "set", `dependencies.@mrpatpat/reqly-core=${version}`, "--workspace", "@mrpatpat/reqly-mcp"]);
 run(["install", "--package-lock-only"]);
 run(["run", "package:vscode"]);
 

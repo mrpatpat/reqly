@@ -1,5 +1,5 @@
 {
-  "name": "@reqly/mcp",
+  "name": "@mrpatpat/reqly-mcp",
   "version": "0.1.0",
   "description": "MCP server for Git-native Reqly requirements and traceability",
   "type": "module",
@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@reqly/core": "0.1.0",
+    "@mrpatpat/reqly-core": "0.1.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
