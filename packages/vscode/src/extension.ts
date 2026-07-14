@@ -7,7 +7,6 @@ import {
   createItem,
   createVerification,
   deleteItem,
-  graphData,
   initRepository,
   parseArtifactLink,
   setArtifact,
@@ -29,7 +28,7 @@ class ItemNode extends vscode.TreeItem {
     const verificationLabel = record.type === "requirement" ? verified === true ? "verified" : verified === false ? "failed" : "verification incomplete" : "";
     this.description = `${record.status}${verificationLabel ? ` · ${verificationLabel}` : ""}${health.length ? ` · ${health.join(", ")}` : ""}`;
     this.tooltip = `${record.data.id}\n${record.data.title}\n${this.description}`;
-    this.contextValue = "reqlyItem";
+    this.contextValue = record.type === "requirement" ? "reqlyRequirement" : "reqlyItem";
     const result = record.type === "verification" ? record.status === "pass" ? true : record.status === "fail" ? false : undefined : verified;
     this.iconPath = result === true ? new vscode.ThemeIcon("check", new vscode.ThemeColor("testing.iconPassed")) : result === false ? new vscode.ThemeIcon("close", new vscode.ThemeColor("testing.iconFailed")) : new vscode.ThemeIcon("symbol-interface");
     this.command = { command: "reqly.openItem", title: "Open Item", arguments: [this] };
@@ -204,6 +203,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("reqly.refresh", () => state.refresh());
   register("reqly.init", async () => { const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; if (!root) return; await initRepository(root); await state.refresh(); });
   register("reqly.newRequirement", async () => createFromUi(state));
+  register("reqly.newSubRequirement", async (node: ItemNode | string) => createSubRequirementFromUi(state, node));
   register("reqly.newVerification", async () => createVerificationFromUi(state));
   register("reqly.openItem", (node: ItemNode | ImpactNode | string) => openItem(state, node));
   register("reqly.previewItem", async (node: ItemNode | ImpactNode | string) => { const record = resolveRecord(state, node); if (record) await vscode.commands.executeCommand("markdown.showPreviewToSide", vscode.Uri.file(record.filePath)); });
@@ -213,7 +213,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("reqly.manageArtifacts", async (node: ItemNode | ImpactNode | string) => manageArtifactsFromUi(state, node));
   register("reqly.deleteItem", async (node: ItemNode | ImpactNode | string) => deleteItemFromUi(state, node));
   register("reqly.acknowledgeImpact", async (node: ImpactNode) => acknowledgeFromUi(state, node));
-  register("reqly.openGraph", () => openGraph(context, state));
 
   const watcher = vscode.workspace.createFileSystemWatcher("**/{.reqly,requirements}/**/*");
   let timer: NodeJS.Timeout | undefined; const changed = new Map<string, vscode.Uri>();
@@ -236,6 +235,23 @@ async function openItem(state: ExtensionState, value: ItemNode | ImpactNode | st
 async function createFromUi(state: ExtensionState): Promise<void> {
   const itemId = await promptCreateItem(state, "requirement"); await state.refresh();
   if (itemId) await openItem(state, itemId);
+}
+
+async function createSubRequirementFromUi(state: ExtensionState, value: ItemNode | string): Promise<void> {
+  if (!state.repository) return;
+  const parent = resolveRecord(state, value);
+  if (!parent || parent.type !== "requirement" || !await ensureSaved(parent)) return;
+  const title = await vscode.window.showInputBox({ title: `New sub-requirement · ${parent.data.id}`, prompt: `Title for a child of ${parent.data.id}`, validateInput: (input) => input.trim() ? undefined : "A title is required." });
+  if (!title) return;
+  const created = await createItem(state.repository, { title: title.trim() });
+  const childId = created.itemId;
+  if (!childId) return;
+  await state.refresh();
+  const child = state.repository.records.get(childId);
+  if (!child) return;
+  await setRelation(state.repository, child.data.id, "add", { type: "required-by", target: parent.data.id }, child.version);
+  await state.refresh();
+  await openItem(state, childId);
 }
 
 async function createVerificationFromUi(state: ExtensionState): Promise<void> {
@@ -385,20 +401,6 @@ async function acknowledgeFromUi(state: ExtensionState, node: ImpactNode): Promi
   const confirmation = await vscode.window.showWarningMessage(`Acknowledge ${node.entry.relatedId} for ${node.entry.record.data.id}?`, { modal: true }, "Acknowledge");
   if (confirmation !== "Acknowledge") return;
   await acknowledgeImpact(state.repository, node.entry.record.data.id, node.entry.relatedId, node.entry.record.version); await state.refresh();
-}
-
-function nonce(): string { return [...crypto.getRandomValues(new Uint8Array(16))].map((value) => value.toString(16).padStart(2, "0")).join(""); }
-
-function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, entry: "graph", data: unknown): string {
-  const script = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "dist", `${entry}.js`)); const token = nonce();
-  const encoded = Buffer.from(JSON.stringify(data)).toString("base64");
-  return `<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src 'nonce-${token}'; script-src 'nonce-${token}' ${webview.cspSource};"><style nonce="${token}">html,body,#root{width:100%;height:100%;margin:0;background:var(--vscode-editor-background);color:var(--vscode-editor-foreground);font-family:var(--vscode-font-family)}</style></head><body><div id="root"></div><script nonce="${token}">window.__REQLY_DATA__=JSON.parse(atob("${encoded}"));</script><script nonce="${token}" src="${script}"></script></body></html>`;
-}
-
-async function openGraph(context: vscode.ExtensionContext, state: ExtensionState): Promise<void> {
-  if (!state.repository) return; const panel = vscode.window.createWebviewPanel("reqly.graph", "Reqly Graph", vscode.ViewColumn.Active, { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "dist")] });
-  panel.webview.html = webviewHtml(panel.webview, context.extensionUri, "graph", graphData(state.repository));
-  panel.webview.onDidReceiveMessage((message) => { if (message.type === "open") void openItem(state, message.id); });
 }
 
 export function deactivate(): void {}

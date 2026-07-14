@@ -2,9 +2,8 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
-    "jsx": "react-jsx",
     "rootDir": "src",
     "types": ["node", "vscode"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.ts"]
 }
