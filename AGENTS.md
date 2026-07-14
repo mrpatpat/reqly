@@ -4,10 +4,10 @@
 
 Reqly is an npm-workspace TypeScript project for a Git-native requirements and traceability VS Code extension.
 
-- `packages/core` is the extension's private implementation library for formats, schemas, Git behavior, validation, reports, and mutations.
-- `packages/vscode` contains the VS Code extension and requirement graph webview.
+- `packages/core` is the extension's private implementation library for formats, schemas, Git behavior, validation, and mutations.
+- `packages/vscode` contains the VS Code extension and requirement explorer.
 
-Keep Markdown and YAML files as the source of truth. Caches, build output, webviews, and reports must remain disposable projections.
+Keep Markdown and YAML files as the source of truth. Caches and build output must remain disposable projections.
 
 ## Working Rules
 

@@ -34,7 +34,7 @@ function generatedAgentBlock(config: ReqlyConfig = defaultConfig): string {
 ## Reqly
 
 - Use Reqly's VS Code actions for interactive mutations; follow the format rules below when editing \`index.md\` directly.
-- Query only the item and graph depth needed for the current work.
+- Query only the item and relation depth needed for the current work.
 - Keep IDs stable. Never reuse or invent an existing ID.
 - Requirements need a \`## Requirement\` section.
 - Verifications need \`## Procedure\`, \`## Expected Result\`, and \`## Evidence\` sections and use only \`pass\` or \`fail\` status.

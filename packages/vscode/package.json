@@ -24,7 +24,7 @@
   "engines": {
     "vscode": "^1.107.0"
   },
-  "categories": ["Other", "Visualization"],
+  "categories": ["Other"],
   "activationEvents": ["workspaceContains:.reqly/AGENTS.md"],
   "scripts": {
     "build": "node ./scripts/build.mjs",
@@ -32,15 +32,9 @@
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@reqly/core": "0.1.0",
-    "cytoscape": "^3.33.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "@reqly/core": "0.1.0"
   },
   "devDependencies": {
-    "@types/cytoscape": "^3.21.0",
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
     "@types/vscode": "1.107.0",
     "esbuild": "^0.25.0"
   },
@@ -64,7 +58,6 @@
       { "command": "reqly.newRequirement", "title": "Reqly: New Requirement" },
       { "command": "reqly.newVerification", "title": "Reqly: New Verification" },
       { "command": "reqly.validate", "title": "Reqly: Validate Project" },
-      { "command": "reqly.openGraph", "title": "Reqly: Open Requirement Graph" },
       { "command": "reqly.openItem", "title": "Reqly: Open Item" },
       { "command": "reqly.previewItem", "title": "Reqly: Preview Markdown" },
       { "command": "reqly.setStatus", "title": "Reqly: Change Status" },
@@ -77,7 +70,6 @@
       "view/title": [
         { "command": "reqly.newRequirement", "when": "view == reqly.requirements", "group": "navigation" },
         { "command": "reqly.newVerification", "when": "view == reqly.requirements", "group": "navigation" },
-        { "command": "reqly.openGraph", "when": "view == reqly.requirements", "group": "navigation" },
         { "command": "reqly.refresh", "when": "view =~ /reqly\\./", "group": "navigation" }
       ],
       "view/item/context": [
