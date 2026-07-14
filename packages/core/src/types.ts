@@ -1,4 +1,3 @@
-export const API_VERSION = "reqly/v1" as const;
 export const REQUIREMENT_SCHEMA = "reqly/requirement/v1" as const;
 export const VERIFICATION_SCHEMA = "reqly/verification/v1" as const;
 
@@ -92,11 +91,7 @@ export interface ReqlyConfig {
   artifacts: {
     lfsWarningBytes: number;
   };
-  baselines: {
-    tagPrefix: string;
-  };
   ai: {
-    maxResourceBytes: number;
     agentsPath: string;
   };
 }
@@ -114,48 +109,6 @@ export interface ItemStatus {
   id: string;
   status: string;
   health: HealthCode[];
-}
-
-export interface RepositoryInfo {
-  root: string;
-  head: string | null;
-  dirty: boolean;
-}
-
-export interface ApiEnvelope<T> {
-  apiVersion: typeof API_VERSION;
-  repository: Omit<RepositoryInfo, "root">;
-  data: T;
-  diagnostics: Diagnostic[];
-  nextCursor?: string;
-}
-
-export interface SearchFilters {
-  query?: string;
-  status?: string;
-  limit?: number;
-  cursor?: string;
-  includeBody?: boolean;
-}
-
-export interface ContextOptions {
-  depth?: 0 | 1 | 2;
-  includeBody?: boolean;
-  includeArtifacts?: boolean;
-  includeDiagnostics?: boolean;
-}
-
-export interface ItemView {
-  id: string;
-  type: ItemType;
-  title: string;
-  status: string;
-  version: string;
-  path: string;
-  relations: Relation[];
-  artifacts?: string[];
-  verified?: boolean;
-  body?: string;
 }
 
 export interface MutationResult {
