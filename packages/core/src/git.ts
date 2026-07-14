@@ -30,71 +30,6 @@ export class GitRepository {
     return path.resolve(this.root, value);
   }
 
-  async head(): Promise<string | null> {
-    const value = await this.run(["rev-parse", "HEAD"], true);
-    return /^[0-9a-f]{40}$/.test(value) ? value : null;
-  }
-
-  async resolveRevision(revision: string): Promise<string> {
-    const resolved = await this.run(["rev-parse", "--verify", `${revision}^{commit}`], true);
-    if (!resolved) throw new ReqlyError("GIT_HISTORY_MISSING", `Unknown commit or tag ${revision}.`);
-    return resolved;
-  }
-
-  async isDirty(): Promise<boolean> {
-    return (await this.run(["status", "--porcelain"])) !== "";
-  }
-
-  async dirtyFiles(): Promise<Set<string>> {
-    const output = await this.run(["status", "--porcelain"]);
-    return new Set(output ? output.split(/\r?\n/).map((line) => (line.slice(3).split(" -> ").at(-1) ?? "").replaceAll("\\", "/").replace(/^"|"$/g, "")) : []);
-  }
-
-  async trackedFiles(): Promise<Set<string>> {
-    const output = await this.run(["ls-files"]);
-    return new Set(output ? output.split(/\r?\n/).map((file) => file.replaceAll("\\", "/")) : []);
-  }
-
-  async isFileDirty(relativePath: string): Promise<boolean> {
-    return (await this.run(["status", "--porcelain", "--", relativePath])) !== "";
-  }
-
-  async isTracked(relativePath: string): Promise<boolean> {
-    return (await this.run(["ls-files", "--error-unmatch", "--", relativePath], true)) !== "";
-  }
-
-  async showFile(revision: string, relativePath: string): Promise<string | null> {
-    const normalized = relativePath.replaceAll("\\", "/");
-    try {
-      const { stdout } = await execFileAsync("git", ["show", `${revision}:${normalized}`], { cwd: this.root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
-      return stdout;
-    } catch { return null; }
-  }
-
-  async listFiles(revision: string, roots: string[]): Promise<string[]> {
-    const output = await this.run(["ls-tree", "-r", "--name-only", revision, "--", ...roots]);
-    return output ? output.split(/\r?\n/).filter((file) => file.endsWith("/index.md")) : [];
-  }
-
-  async listIndexFiles(revision: string): Promise<string[]> {
-    const output = await this.run(["ls-tree", "-r", "--name-only", revision]);
-    return output ? output.split(/\r?\n/).filter((file) => file.endsWith("/index.md")) : [];
-  }
-
-  async isAncestor(revision: string, descendant = "HEAD"): Promise<boolean> {
-    try {
-      await execFileAsync("git", ["merge-base", "--is-ancestor", revision, descendant], { cwd: this.root });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  async logForPath(relativePath: string, revision?: string): Promise<string[]> {
-    const output = await this.run(["log", "--format=%H", "--follow", ...(revision ? [revision] : []), "--", relativePath]);
-    return output ? output.split(/\r?\n/) : [];
-  }
-
   async unifiedDiff(relativePath: string, oldText: string, newText: string): Promise<string> {
     if (oldText === newText) return "";
     const directory = await mkdtemp(path.join(tmpdir(), "reqly-diff-"));
@@ -110,25 +45,10 @@ export class GitRepository {
     }
   }
 
-  async objectSize(revision: string, relativePath: string): Promise<number | null> {
-    const output = await this.run(["cat-file", "-s", `${revision}:${relativePath.replaceAll("\\", "/")}`], true);
-    return output && Number.isFinite(Number(output)) ? Number(output) : null;
-  }
-
-  async lfsFilter(relativePath: string, revision?: string): Promise<string | null> {
-    const output = await this.run(["check-attr", ...(revision ? [`--source=${revision}`] : []), "filter", "--", relativePath], true);
+  async lfsFilter(relativePath: string): Promise<string | null> {
+    const output = await this.run(["check-attr", "filter", "--", relativePath], true);
     const value = output.split(":").at(-1)?.trim();
     return value && value !== "unspecified" ? value : null;
   }
 
-  async createAnnotatedTag(name: string, message: string): Promise<void> {
-    const exists = await this.run(["rev-parse", "--verify", `refs/tags/${name}`], true);
-    if (exists) throw new ReqlyError("TAG_EXISTS", `Tag ${name} already exists.`);
-    await this.run(["tag", "-a", name, "-m", message]);
-  }
-
-  async listTags(prefix: string): Promise<string[]> {
-    const output = await this.run(["tag", "--list", `${prefix}*`, "--sort=refname"]);
-    return output ? output.split(/\r?\n/) : [];
-  }
 }

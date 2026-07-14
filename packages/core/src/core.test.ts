@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { initRepository, createItem, createVerification, deleteItem, setStatus, setRelation, setArtifact, updateItem, acknowledgeImpact, createBaseline, checkAiGuide, syncAiGuide } from "./mutations.js";
+import { initRepository, createItem, createVerification, deleteItem, setStatus, setRelation, setArtifact, updateItem, acknowledgeImpact, checkAiGuide, syncAiGuide } from "./mutations.js";
 import { ReqlyRepository } from "./repository.js";
 import { dependencyFingerprint, normativeFingerprint, parseRecord, replaceSections } from "./markdown.js";
 import { validateRepository } from "./validate.js";
@@ -96,11 +96,6 @@ describe("Status and impact", () => {
     expect(repository.get("REQ-0001").data.relations?.find((relation) => relation.type === "requires")?.fingerprint).toBeUndefined();
     expect(repository.get("REQ-0002").data.relations?.find((relation) => relation.type === "required-by")?.fingerprint).toBe(`sha256:${dependencyFingerprint(repository.get("REQ-0001"), repository.config.relations)}`);
     expect((await validateRepository(repository)).diagnostics.filter((item) => item.severity === "error")).toEqual([]);
-    expect(await createBaseline(repository, "verified")).toBe("reqly/verified");
-    expect(git(root, "tag", "--list", "reqly/verified")).toBe("reqly/verified");
-    const baseline = await ReqlyRepository.open(root, "reqly/verified");
-    expect(baseline.revision).toMatch(/^[0-9a-f]{40}$/);
-    expect((await validateRepository(baseline)).diagnostics.filter((item) => item.severity === "error")).toEqual([]);
   });
 
   it("adds and removes inverse relations from either direction", async () => {
@@ -143,7 +138,6 @@ describe("Status and impact", () => {
     });
     expect(repository.get("VER-0001").data.relations).toContainEqual({ type: "verifies", target: "REQ-0001" });
     expect(repository.verificationState("REQ-0001")).toBe(true);
-    expect(repository.toView(repository.get("REQ-0001")).verified).toBe(true);
 
     await setStatus(repository, "VER-0001", "fail"); repository = await ReqlyRepository.open(root);
     expect(repository.verificationState("REQ-0001")).toBe(false);
