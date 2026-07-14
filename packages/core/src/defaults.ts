@@ -34,8 +34,7 @@ export const defaultConfig: ReqlyConfig = {
   artifacts: {
     lfsWarningBytes: 10 * 1024 * 1024,
   },
-  baselines: { tagPrefix: "reqly/" },
-  ai: { maxResourceBytes: 20 * 1024 * 1024, agentsPath: ".reqly/AGENTS.md" },
+  ai: { agentsPath: ".reqly/AGENTS.md" },
 };
 
 export const requirementTemplate = `## Requirement

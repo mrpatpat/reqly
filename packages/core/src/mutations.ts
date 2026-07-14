@@ -15,7 +15,6 @@ import {
   type Relation,
   type ReqlyConfig,
 } from "./types.js";
-import { validateRepository } from "./validate.js";
 
 export interface CreateOptions {
   title: string;
@@ -34,7 +33,7 @@ function generatedAgentBlock(config: ReqlyConfig = defaultConfig): string {
   return `<!-- reqly:generated:start -->
 ## Reqly
 
-- Prefer Reqly CLI or MCP mutations over rewriting \`index.md\` files.
+- Use Reqly's VS Code actions for interactive mutations; follow the format rules below when editing \`index.md\` directly.
 - Query only the item and graph depth needed for the current work.
 - Keep IDs stable. Never reuse or invent an existing ID.
 - Requirements need a \`## Requirement\` section.
@@ -47,7 +46,7 @@ function generatedAgentBlock(config: ReqlyConfig = defaultConfig): string {
 - Store each artifact as one Markdown link string in frontmatter, one line per link.
 - Removing a local artifact link also deletes its referenced file; URL artifacts only lose the link.
 - Deleting an item removes its entire folder and every relation that targets it.
-- Run \`reqly validate --format json\` after every mutation sequence.
+- Check the Reqly diagnostics after every mutation sequence.
 - Reqly never stages, commits, pushes, or rewrites Git history.
 - Requirement statuses: ${config.requirements.statuses.join(", ")}.
 - Verification statuses: ${config.verifications.statuses.join(", ")}.
@@ -327,19 +326,6 @@ export async function renumberItem(repository: ReqlyRepository, oldId: string, n
     await rename(source.directory, newDirectory);
   }
   return { changed: true, itemId: newId, unifiedDiff: changes.map((change) => `--- ${change.record.relativePath}\n+++ ${change.record.relativePath}\nID/reference ${oldId} -> ${newId}`).join("\n"), affectedItems: changes.map((change) => change.record.data.id), diagnostics: [] };
-}
-
-export async function createBaseline(repository: ReqlyRepository, name: string): Promise<string> {
-  if (await repository.git.isDirty()) throw new ReqlyError("DIRTY_WORKTREE", "Baseline creation requires a clean worktree.");
-  const head = await repository.git.head();
-  if (!head) throw new ReqlyError("GIT_HISTORY_MISSING", "Baseline creation requires a Git commit.");
-  const validation = await validateRepository(repository);
-  const errors = validation.diagnostics.filter((item) => item.severity === "error");
-  if (errors.length) throw new ReqlyError("VALIDATION_FAILED", `Cannot create a baseline with ${errors.length} validation error(s).`, errors);
-  const safe = name.replace(/[^A-Za-z0-9._/-]/g, "-");
-  const tag = `${repository.config.baselines.tagPrefix}${safe}`;
-  await repository.git.createAnnotatedTag(tag, `Reqly baseline ${name}\n\nSchema: reqly/v1\nCommit: ${head}\nValidation: clean`);
-  return tag;
 }
 
 export async function removeItemDirectory(directory: string): Promise<void> {
