@@ -56,6 +56,7 @@
       { "command": "reqly.init", "title": "Reqly: Initialize Project" },
       { "command": "reqly.refresh", "title": "Reqly: Refresh" },
       { "command": "reqly.newRequirement", "title": "Reqly: New Requirement" },
+      { "command": "reqly.newSubRequirement", "title": "Reqly: New Sub-requirement" },
       { "command": "reqly.newVerification", "title": "Reqly: New Verification" },
       { "command": "reqly.validate", "title": "Reqly: Validate Project" },
       { "command": "reqly.openItem", "title": "Reqly: Open Item" },
@@ -73,11 +74,12 @@
         { "command": "reqly.refresh", "when": "view =~ /reqly\\./", "group": "navigation" }
       ],
       "view/item/context": [
-        { "command": "reqly.previewItem", "when": "viewItem == reqlyItem", "group": "inline" },
-        { "command": "reqly.setStatus", "when": "viewItem == reqlyItem", "group": "reqly" },
-        { "command": "reqly.manageRelations", "when": "viewItem == reqlyItem", "group": "reqly" },
-        { "command": "reqly.manageArtifacts", "when": "viewItem == reqlyItem", "group": "reqly" },
-        { "command": "reqly.deleteItem", "when": "viewItem == reqlyItem", "group": "reqly" },
+        { "command": "reqly.newSubRequirement", "when": "viewItem == reqlyRequirement", "group": "reqly@1" },
+        { "command": "reqly.previewItem", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "inline" },
+        { "command": "reqly.setStatus", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
+        { "command": "reqly.manageRelations", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
+        { "command": "reqly.manageArtifacts", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
+        { "command": "reqly.deleteItem", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
         { "command": "reqly.acknowledgeImpact", "when": "viewItem == reqlyImpactAcknowledgeable", "group": "reqly" }
       ]
     }

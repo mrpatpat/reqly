@@ -28,7 +28,7 @@ class ItemNode extends vscode.TreeItem {
     const verificationLabel = record.type === "requirement" ? verified === true ? "verified" : verified === false ? "failed" : "verification incomplete" : "";
     this.description = `${record.status}${verificationLabel ? ` · ${verificationLabel}` : ""}${health.length ? ` · ${health.join(", ")}` : ""}`;
     this.tooltip = `${record.data.id}\n${record.data.title}\n${this.description}`;
-    this.contextValue = "reqlyItem";
+    this.contextValue = record.type === "requirement" ? "reqlyRequirement" : "reqlyItem";
     const result = record.type === "verification" ? record.status === "pass" ? true : record.status === "fail" ? false : undefined : verified;
     this.iconPath = result === true ? new vscode.ThemeIcon("check", new vscode.ThemeColor("testing.iconPassed")) : result === false ? new vscode.ThemeIcon("close", new vscode.ThemeColor("testing.iconFailed")) : new vscode.ThemeIcon("symbol-interface");
     this.command = { command: "reqly.openItem", title: "Open Item", arguments: [this] };
@@ -203,6 +203,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("reqly.refresh", () => state.refresh());
   register("reqly.init", async () => { const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; if (!root) return; await initRepository(root); await state.refresh(); });
   register("reqly.newRequirement", async () => createFromUi(state));
+  register("reqly.newSubRequirement", async (node: ItemNode | string) => createSubRequirementFromUi(state, node));
   register("reqly.newVerification", async () => createVerificationFromUi(state));
   register("reqly.openItem", (node: ItemNode | ImpactNode | string) => openItem(state, node));
   register("reqly.previewItem", async (node: ItemNode | ImpactNode | string) => { const record = resolveRecord(state, node); if (record) await vscode.commands.executeCommand("markdown.showPreviewToSide", vscode.Uri.file(record.filePath)); });
@@ -234,6 +235,23 @@ async function openItem(state: ExtensionState, value: ItemNode | ImpactNode | st
 async function createFromUi(state: ExtensionState): Promise<void> {
   const itemId = await promptCreateItem(state, "requirement"); await state.refresh();
   if (itemId) await openItem(state, itemId);
+}
+
+async function createSubRequirementFromUi(state: ExtensionState, value: ItemNode | string): Promise<void> {
+  if (!state.repository) return;
+  const parent = resolveRecord(state, value);
+  if (!parent || parent.type !== "requirement" || !await ensureSaved(parent)) return;
+  const title = await vscode.window.showInputBox({ title: `New sub-requirement · ${parent.data.id}`, prompt: `Title for a child of ${parent.data.id}`, validateInput: (input) => input.trim() ? undefined : "A title is required." });
+  if (!title) return;
+  const created = await createItem(state.repository, { title: title.trim() });
+  const childId = created.itemId;
+  if (!childId) return;
+  await state.refresh();
+  const child = state.repository.records.get(childId);
+  if (!child) return;
+  await setRelation(state.repository, child.data.id, "add", { type: "required-by", target: parent.data.id }, child.version);
+  await state.refresh();
+  await openItem(state, childId);
 }
 
 async function createVerificationFromUi(state: ExtensionState): Promise<void> {
