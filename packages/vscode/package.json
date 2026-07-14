@@ -75,6 +75,7 @@
       ],
       "view/item/context": [
         { "command": "reqly.newSubRequirement", "when": "viewItem == reqlyRequirement", "group": "reqly@1" },
+        { "command": "reqly.newVerification", "when": "viewItem == reqlyRequirement", "group": "reqly@2" },
         { "command": "reqly.previewItem", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "inline" },
         { "command": "reqly.setStatus", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
         { "command": "reqly.manageRelations", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },

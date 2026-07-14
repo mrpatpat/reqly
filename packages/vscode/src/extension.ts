@@ -24,7 +24,7 @@ interface ImpactEntry { record: ReqlyRecord; relatedId?: string; message: string
 
 class ItemNode extends vscode.TreeItem {
   constructor(public readonly record: ReqlyRecord, health: string[] = [], verified?: boolean, public readonly lineage: string[] = [], collapsible = false) {
-    super(`${record.data.id}: ${record.data.title}`, collapsible ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+    super(record.data.title, collapsible ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
     const verificationLabel = record.type === "requirement" ? verified === true ? "verified" : verified === false ? "failed" : "verification incomplete" : "";
     this.description = `${record.status}${verificationLabel ? ` · ${verificationLabel}` : ""}${health.length ? ` · ${health.join(", ")}` : ""}`;
     this.tooltip = `${record.data.id}\n${record.data.title}\n${this.description}`;
@@ -204,7 +204,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("reqly.init", async () => { const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; if (!root) return; await initRepository(root); await state.refresh(); });
   register("reqly.newRequirement", async () => createFromUi(state));
   register("reqly.newSubRequirement", async (node: ItemNode | string) => createSubRequirementFromUi(state, node));
-  register("reqly.newVerification", async () => createVerificationFromUi(state));
+  register("reqly.newVerification", async (node?: ItemNode | string) => node ? createVerificationForUi(state, node) : createVerificationFromUi(state));
   register("reqly.openItem", (node: ItemNode | ImpactNode | string) => openItem(state, node));
   register("reqly.previewItem", async (node: ItemNode | ImpactNode | string) => { const record = resolveRecord(state, node); if (record) await vscode.commands.executeCommand("markdown.showPreviewToSide", vscode.Uri.file(record.filePath)); });
   register("reqly.validate", async () => { await state.refresh(); const errors = state.diagnostics.filter((item) => item.severity === "error").length; const warnings = state.diagnostics.filter((item) => item.severity === "warning").length; void vscode.window.showInformationMessage(`Reqly: ${errors} error(s), ${warnings} warning(s).`); });
@@ -257,6 +257,20 @@ async function createSubRequirementFromUi(state: ExtensionState, value: ItemNode
 async function createVerificationFromUi(state: ExtensionState): Promise<void> {
   const itemId = await promptCreateItem(state, "verification"); await state.refresh();
   if (itemId) await openItem(state, itemId);
+}
+
+async function createVerificationForUi(state: ExtensionState, value: ItemNode | string): Promise<void> {
+  if (!state.repository) return;
+  const parent = resolveRecord(state, value);
+  if (!parent || parent.type !== "requirement" || !await ensureSaved(parent)) return;
+  const verificationId = await promptCreateItem(state, "verification");
+  if (!verificationId) return;
+  await state.refresh();
+  const currentParent = state.repository.records.get(parent.data.id);
+  if (!currentParent) return;
+  await setRelation(state.repository, currentParent.data.id, "add", { type: "verified-by", target: verificationId }, currentParent.version);
+  await state.refresh();
+  await openItem(state, verificationId);
 }
 
 async function promptCreateItem(state: ExtensionState, type: ItemType): Promise<string | undefined> {
