@@ -4,6 +4,20 @@ Universal MCP server for Reqly. It exposes requirements, verifications, validati
 
 The server operates on the current working directory by default. Set `REQLY_ROOT` when the Reqly repository is elsewhere.
 
+Install it directly from the agent's terminal:
+
+Codex:
+
+```sh
+codex mcp add reqly -- npx -y @mrpatpat/reqly-mcp
+```
+
+Claude Code:
+
+```sh
+claude mcp add reqly -- npx -y @mrpatpat/reqly-mcp
+```
+
 Example Codex configuration:
 
 ```toml
