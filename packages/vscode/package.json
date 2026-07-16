@@ -56,6 +56,8 @@
       { "command": "reqly.init", "title": "Reqly: Initialize Project" },
       { "command": "reqly.refresh", "title": "Reqly: Refresh" },
       { "command": "reqly.newRequirement", "title": "Reqly: New Requirement" },
+      { "command": "reqly.newFolder", "title": "Reqly: New Folder", "icon": "$(new-folder)" },
+      { "command": "reqly.addFolderItem", "title": "Reqly: Add Item to Folder" },
       { "command": "reqly.newSubRequirement", "title": "Reqly: New Sub-requirement" },
       { "command": "reqly.newVerification", "title": "Reqly: New Verification" },
       { "command": "reqly.validate", "title": "Reqly: Validate Project" },
@@ -73,6 +75,7 @@
     "menus": {
       "view/title": [
         { "command": "reqly.newRequirement", "when": "view == reqly.requirements", "group": "navigation" },
+        { "command": "reqly.newFolder", "when": "view == reqly.requirements", "group": "navigation" },
         { "command": "reqly.newVerification", "when": "view == reqly.requirements", "group": "navigation" },
         { "command": "reqly.acknowledgeAllImpacts", "when": "view == reqly.impacts", "group": "navigation" },
         { "command": "reqly.refresh", "when": "view =~ /reqly\\./", "group": "navigation" }
@@ -81,11 +84,12 @@
         { "command": "reqly.newSubRequirement", "when": "viewItem == reqlyRequirement", "group": "reqly@1" },
         { "command": "reqly.newVerification", "when": "viewItem == reqlyRequirement", "group": "reqly@2" },
         { "command": "reqly.acknowledgeSubtreeImpacts", "when": "viewItem == reqlyRequirement", "group": "reqly@3" },
-        { "command": "reqly.previewItem", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "inline" },
+        { "command": "reqly.addFolderItem", "when": "viewItem == reqlyFolder", "group": "reqly@1" },
+        { "command": "reqly.previewItem", "when": "viewItem =~ /reqly(Folder|Item|Requirement)/", "group": "inline" },
         { "command": "reqly.setStatus", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
-        { "command": "reqly.manageRelations", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
-        { "command": "reqly.manageArtifacts", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
-        { "command": "reqly.deleteItem", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
+        { "command": "reqly.manageRelations", "when": "viewItem =~ /reqly(Folder|Item|Requirement)/", "group": "reqly" },
+        { "command": "reqly.manageArtifacts", "when": "viewItem =~ /reqly(Folder|Item|Requirement)/", "group": "reqly" },
+        { "command": "reqly.deleteItem", "when": "viewItem =~ /reqly(Folder|Item|Requirement)/", "group": "reqly" },
         { "command": "reqly.acknowledgeImpact", "when": "viewItem == reqlyImpactAcknowledgeable", "group": "reqly" }
       ]
     }

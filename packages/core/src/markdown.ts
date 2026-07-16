@@ -3,6 +3,7 @@ import { parseDocument, stringify, type Document } from "yaml";
 import {
   REQUIREMENT_SCHEMA,
   VERIFICATION_SCHEMA,
+  FOLDER_SCHEMA,
   ReqlyError,
   type ArtifactLink,
   type MarkdownSection,
@@ -51,7 +52,7 @@ export function parseRecord(raw: string, filePath: string, root: string): ReqlyR
   const document = parseDocument(yaml);
   if (document.errors.length) throw new ReqlyError("INVALID_YAML", document.errors.map((error) => error.message).join("; "));
   const data = document.toJS() as RecordData;
-  const type = data.schema === REQUIREMENT_SCHEMA ? "requirement" : data.schema === VERIFICATION_SCHEMA ? "verification" : undefined;
+  const type = data.schema === REQUIREMENT_SCHEMA ? "requirement" : data.schema === VERIFICATION_SCHEMA ? "verification" : data.schema === FOLDER_SCHEMA ? "folder" : undefined;
   if (!type) throw new ReqlyError("INVALID_SCHEMA", `Unsupported record schema: ${String(data.schema)}`);
   if (typeof data.status !== "string" || !data.status.trim()) throw new ReqlyError("INVALID_STATUS", "A Reqly item needs a status.");
   if ("lifecycle" in data) throw new ReqlyError("INVALID_STATUS", "lifecycle is not supported; store only the current status.");

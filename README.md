@@ -44,6 +44,8 @@ Create a child requirement, such as "Display the warning below 10% capacity", an
 
 Now the Requirements view shows the product requirement as a parent-first tree. The same view also places linked verifications beneath their requirements.
 
+For purely visual organization, create a folder and use its `contains` relation to place requirements, verifications, or nested folders beneath it. Folder relations are non-normative: rearranging the tree does not change requirement fingerprints. A folder's icon color and check state are derived from the items it contains.
+
 ### 5. Add evidence
 
 Create a verification and link it to the requirement with `verified-by`:
@@ -70,7 +72,9 @@ The verification document contains `Procedure`, `Expected Result`, and `Evidence
 
 Later, the battery specification changes. Edit the parent requirement or its linked normative data. Reqly detects that the child or verification was based on an older dependency fingerprint and puts it in the impact queue.
 
-Review the affected items, update the requirement or repeat the test, then acknowledge the impact. Reqly refreshes the fingerprint. It never stages, commits, pushes, or rewrites Git history; use your normal Git workflow to review and commit the Markdown and YAML changes.
+Review the affected items, update the requirement or repeat the test, then acknowledge the impact. Reqly refreshes the fingerprint. The Impact Queue toolbar can acknowledge all pending fingerprint changes at once, while a requirement's context menu can acknowledge its own subtree. Draft-parent, broken-reference, and cycle warnings remain until their underlying condition is fixed.
+
+Selecting items in the Requirements or Impact Queue tree reuses VS Code's preview editor, preventing navigation from leaving a trail of open tabs. Reqly never stages, commits, pushes, or rewrites Git history; use your normal Git workflow to review and commit the Markdown and YAML changes.
 
 ## Where things live
 
@@ -82,7 +86,7 @@ Review the affected items, update the requirement or repeat the test, then ackno
     └── artifacts/
 ```
 
-Requirements and verifications are stable ID-named folders. Deleting an item requires confirmation and removes its owned artifacts and incoming relations. Unknown `x-*` fields and hand-authored Markdown remain yours.
+Requirements, verifications, and organizational folders are stable ID-named folders. Folder records live under `.reqly/folders`, use `schema: reqly/folder/v1`, an `FOL-*` ID, and the fixed technical status `active`. Deleting an item requires confirmation and removes its owned artifacts and incoming relations. Unknown `x-*` fields and hand-authored Markdown remain yours.
 
 ## Install and develop
 

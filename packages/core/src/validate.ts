@@ -31,12 +31,12 @@ export async function validateRepository(repository: ReqlyRepository): Promise<V
     const idSettings = repository.config.ids[record.type];
     if (!new RegExp(`^${escapeRegExp(idSettings.prefix)}\\d{${idSettings.width},}$`).test(record.data.id)) diagnostics.push(diagnostic(record, "INVALID_ID", "error", `${record.data.id} does not match configured prefix and width.`));
     if (!record.data.title?.trim()) diagnostics.push(diagnostic(record, "TITLE_REQUIRED", "error", "Title is required."));
-    const requiredSections = record.type === "requirement" ? ["Requirement"] : ["Procedure", "Expected Result", "Evidence"];
+    const requiredSections = record.type === "requirement" ? ["Requirement"] : record.type === "verification" ? ["Procedure", "Expected Result", "Evidence"] : [];
     for (const requiredSection of requiredSections) {
       if (!record.sections.some((section) => section.name.toLowerCase() === requiredSection.toLowerCase())) diagnostics.push(diagnostic(record, "SECTION_REQUIRED", "error", `Missing required ## ${requiredSection} section.`));
     }
 
-    const statuses: readonly string[] = record.type === "requirement" ? repository.config.requirements.statuses : repository.config.verifications.statuses;
+    const statuses: readonly string[] = record.type === "requirement" ? repository.config.requirements.statuses : record.type === "verification" ? repository.config.verifications.statuses : repository.config.folders.statuses;
     if (!statuses.includes(record.status)) diagnostics.push(diagnostic(record, "INVALID_STATUS", "error", `Unknown ${record.type} status ${record.status || "(missing)"}.`));
 
     if (record.type === "requirement" && record.status === "superseded" && !(record.data.relations ?? []).some((relation) => relation.type === "superseded-by")) {

@@ -37,7 +37,7 @@ export class ReqlyRepository {
     const config = defaultConfig;
     const records = new Map<string, ReqlyRecord>();
     const diagnostics: Diagnostic[] = [];
-    const roots = [config.roots.requirements, config.roots.verifications];
+    const roots = [config.roots.requirements, config.roots.verifications, config.roots.folders];
     const files = (await Promise.all(roots.map((folder) => findIndexFiles(path.join(absolute, folder))))).flat().sort();
     for (const file of files) {
       try {
@@ -80,6 +80,11 @@ export class ReqlyRepository {
     if (record.type === "verification") return record.status === "pass" ? true : record.status === "fail" ? false : undefined;
     const nextVisiting = new Set(visiting).add(id);
     const evidence: Array<boolean | undefined> = [];
+    if (record.type === "folder") {
+      for (const relation of record.data.relations ?? []) {
+        if (relation.type === "contains") evidence.push(this.verificationState(relation.target, nextVisiting));
+      }
+    }
     for (const relation of record.data.relations ?? []) {
       const definition = this.config.relations[relation.type];
       if (definition?.source === "requirement" && definition.target === "verification") evidence.push(this.verificationState(relation.target, nextVisiting));
@@ -90,6 +95,36 @@ export class ReqlyRepository {
     if (!evidence.length) return undefined;
     if (evidence.some((value) => value === false)) return false;
     return evidence.every((value) => value === true) ? true : undefined;
+  }
+
+  hierarchyChildren(id: string): ReqlyRecord[] {
+    const parent = this.records.get(id);
+    if (!parent) return [];
+    const children: ReqlyRecord[] = [];
+    if (parent.type === "folder") {
+      for (const relation of parent.data.relations ?? []) {
+        if (relation.type !== "contains") continue;
+        const child = this.records.get(relation.target);
+        if (child) children.push(child);
+      }
+    }
+    if (parent.type === "requirement") {
+      for (const record of this.records.values()) {
+        if (record.type === "requirement" && (record.data.relations ?? []).some((relation) => this.config.relations[relation.type]?.acyclic === true && relation.target === id)) children.push(record);
+      }
+      for (const relation of parent.data.relations ?? []) {
+        const definition = this.config.relations[relation.type]; const target = this.records.get(relation.target);
+        if (definition?.source === "requirement" && definition.target === "verification" && target) children.push(target);
+      }
+    }
+    return [...new Map(children.map((record) => [record.data.id, record])).values()];
+  }
+
+  hasHierarchyParent(record: ReqlyRecord): boolean {
+    if ([...this.records.values()].some((candidate) => candidate.type === "folder" && (candidate.data.relations ?? []).some((relation) => relation.type === "contains" && relation.target === record.data.id))) return true;
+    if (record.type === "requirement") return (record.data.relations ?? []).some((relation) => this.config.relations[relation.type]?.acyclic === true && this.records.has(relation.target));
+    if (record.type === "verification") return [...this.records.values()].some((candidate) => candidate.type === "requirement" && (candidate.data.relations ?? []).some((relation) => this.config.relations[relation.type]?.target === "verification" && relation.target === record.data.id));
+    return false;
   }
 
 }

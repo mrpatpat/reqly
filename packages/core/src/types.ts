@@ -1,7 +1,8 @@
 export const REQUIREMENT_SCHEMA = "reqly/requirement/v1" as const;
 export const VERIFICATION_SCHEMA = "reqly/verification/v1" as const;
+export const FOLDER_SCHEMA = "reqly/folder/v1" as const;
 
-export type ItemType = "requirement" | "verification";
+export type ItemType = "requirement" | "verification" | "folder";
 export type Severity = "error" | "warning" | "info";
 
 export interface Relation {
@@ -33,7 +34,12 @@ export interface VerificationData extends BaseRecordData {
   schema: typeof VERIFICATION_SCHEMA;
 }
 
-export type RecordData = RequirementData | VerificationData;
+export interface FolderData extends BaseRecordData {
+  schema: typeof FOLDER_SCHEMA;
+  status: "active";
+}
+
+export type RecordData = RequirementData | VerificationData | FolderData;
 
 export interface MarkdownSection {
   name: string;
@@ -76,16 +82,21 @@ export interface ReqlyConfig {
   roots: {
     requirements: string;
     verifications: string;
+    folders: string;
   };
   ids: {
     requirement: { prefix: string; width: number };
     verification: { prefix: string; width: number };
+    folder: { prefix: string; width: number };
   };
   requirements: {
     statuses: string[];
   };
   verifications: {
     statuses: Array<"pass" | "fail">;
+  };
+  folders: {
+    statuses: Array<"active">;
   };
   relations: Record<string, RelationDefinition>;
   artifacts: {

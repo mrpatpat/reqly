@@ -1,16 +1,20 @@
 import type { ReqlyConfig } from "./types.js";
 
 export const defaultConfig: ReqlyConfig = {
-  roots: { requirements: ".reqly/requirements", verifications: ".reqly/verifications" },
+  roots: { requirements: ".reqly/requirements", verifications: ".reqly/verifications", folders: ".reqly/folders" },
   ids: {
     requirement: { prefix: "REQ-", width: 4 },
     verification: { prefix: "VER-", width: 4 },
+    folder: { prefix: "FOL-", width: 4 },
   },
   requirements: {
     statuses: ["draft", "accepted", "rejected", "superseded", "retired"],
   },
   verifications: { statuses: ["pass", "fail"] },
+  folders: { statuses: ["active"] },
   relations: {
+    contains: { source: "folder", target: "any", inverse: "contained-by", normative: false, acyclic: true, propagatesImpact: true },
+    "contained-by": { source: "any", target: "folder", inverse: "contains", normative: false },
     "required-by": {
       source: "requirement",
       target: "requirement",
@@ -63,4 +67,9 @@ Record or link the evidence produced by this verification.
 
 ## Notes
 
+`;
+
+export const folderTemplate = `## Notes
+
+Use this folder to organize Reqly items.
 `;

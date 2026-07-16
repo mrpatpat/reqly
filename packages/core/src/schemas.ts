@@ -28,4 +28,10 @@ export const schemas = {
     properties: { schema: { const: "reqly/verification/v1" }, ...commonProperties, id: { type: "string", pattern: "^VER-[0-9]{4,}$" }, status: { enum: ["pass", "fail"] } },
     patternProperties: { "^x-": true }, additionalProperties: false,
   },
+  folder: {
+    $schema: "https://json-schema.org/draft/2020-12/schema", $id: "reqly/folder/v1", type: "object",
+    required: ["schema", "id", "title", "status"],
+    properties: { schema: { const: "reqly/folder/v1" }, ...commonProperties, id: { type: "string", pattern: "^FOL-[0-9]{4,}$" }, status: { const: "active" } },
+    patternProperties: { "^x-": true }, additionalProperties: false,
+  },
 } as const;

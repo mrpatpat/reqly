@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { createItem, createVerification, setRelation, setStatus, validateRepository } from "@mrpatpat/reqly-core";
+import { createFolder, createItem, createVerification, setRelation, setStatus, validateRepository } from "@mrpatpat/reqly-core";
 import { ReqlyRepository } from "@mrpatpat/reqly-core";
 import * as z from "zod";
 
@@ -20,8 +20,8 @@ function summary(record: Awaited<ReturnType<ReqlyRepository["get"]>>): Record<st
 }
 
 server.registerTool("reqly_list_items", {
-  description: "List Reqly requirements and verifications. Use this to discover item IDs before reading or changing items.",
-  inputSchema: { type: z.enum(["requirement", "verification"]).optional(), status: z.string().optional() },
+  description: "List Reqly requirements, verifications, and organizational folders. Use this to discover item IDs before reading or changing items.",
+  inputSchema: { type: z.enum(["requirement", "verification", "folder"]).optional(), status: z.string().optional() },
 }, async ({ type, status }) => {
   const repo = await repository();
   const items = [...repo.records.values()].filter((record) => (!type || record.type === type) && (!status || record.status === status)).sort((a, b) => a.data.id.localeCompare(b.data.id)).map(summary);
@@ -77,8 +77,24 @@ server.registerTool("reqly_create_verification", {
   return { content: [{ type: "text", text: JSON.stringify({ created: created.itemId, requirementId, item: summary(repo.get(created.itemId)) }, null, 2) }] };
 });
 
+server.registerTool("reqly_create_folder", {
+  description: "Create an organizational folder, optionally containing existing Reqly items.",
+  inputSchema: { title: z.string(), itemIds: z.array(z.string()).optional() },
+}, async ({ title, itemIds }) => {
+  let repo = await repository();
+  const created = await createFolder(repo, { title });
+  if (!created.itemId) throw new Error("Reqly did not return the new folder ID.");
+  for (const itemId of itemIds ?? []) {
+    repo = await repository();
+    const folder = repo.get(created.itemId);
+    await setRelation(repo, folder.data.id, "add", { type: "contains", target: itemId }, folder.version);
+  }
+  repo = await repository();
+  return { content: [{ type: "text", text: JSON.stringify({ created: created.itemId, itemIds: itemIds ?? [], item: summary(repo.get(created.itemId)) }, null, 2) }] };
+});
+
 server.registerTool("reqly_set_status", {
-  description: "Change a Reqly requirement or verification to a configured status.",
+  description: "Change a Reqly requirement or verification to a configured status. Folder status is fixed to active.",
   inputSchema: { id: z.string(), status: z.string() },
 }, async ({ id, status }) => {
   const repo = await repository(); const record = repo.get(id);

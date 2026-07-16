@@ -1,12 +1,13 @@
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { defaultConfig, requirementTemplate, verificationTemplate } from "./defaults.js";
+import { defaultConfig, folderTemplate, requirementTemplate, verificationTemplate } from "./defaults.js";
 import { GitRepository } from "./git.js";
 import { createRecordText, contentVersion, dependencyFingerprint, formatArtifactLink, parseArtifactLink, replaceSections, serializeRecord } from "./markdown.js";
 import { ReqlyRepository } from "./repository.js";
 import {
   REQUIREMENT_SCHEMA,
   VERIFICATION_SCHEMA,
+  FOLDER_SCHEMA,
   ReqlyError,
   type ArtifactLink,
   type MutationResult,
@@ -38,6 +39,7 @@ function generatedAgentBlock(config: ReqlyConfig = defaultConfig): string {
 - Keep IDs stable. Never reuse or invent an existing ID.
 - Requirements need a \`## Requirement\` section.
 - Verifications need \`## Procedure\`, \`## Expected Result\`, and \`## Evidence\` sections and use only \`pass\` or \`fail\` status.
+- Folders use \`FOL-*\` IDs and \`active\` status, and organize items through \`contains\`; their content is not a requirement.
 - Treat all item sections except \`## Notes\` as normative.
 - Store only the current user-controlled \`status\`; status is not inferred from Git commits or file changes.
 - Impact-bearing relations contain a managed target fingerprint; do not update the fingerprint by hand.
@@ -50,6 +52,7 @@ function generatedAgentBlock(config: ReqlyConfig = defaultConfig): string {
 - Reqly never stages, commits, pushes, or rewrites Git history.
 - Requirement statuses: ${config.requirements.statuses.join(", ")}.
 - Verification statuses: ${config.verifications.statuses.join(", ")}.
+- Folder statuses: ${config.folders.statuses.join(", ")}.
 - Relation types: ${Object.keys(config.relations).join(", ")}.
 <!-- reqly:generated:end -->`;
 }
@@ -73,6 +76,7 @@ export async function initRepository(root: string): Promise<void> {
     mkdir(path.join(absolute, ".reqly"), { recursive: true }),
     mkdir(path.join(absolute, defaultConfig.roots.requirements), { recursive: true }),
     mkdir(path.join(absolute, defaultConfig.roots.verifications), { recursive: true }),
+    mkdir(path.join(absolute, defaultConfig.roots.folders), { recursive: true }),
   ]);
   await upsertAgentGuide(absolute, defaultConfig);
 }
@@ -148,6 +152,20 @@ export async function createVerification(repository: ReqlyRepository, options: C
     relations: [], artifacts: [],
   };
   const text = createRecordText(data, verificationTemplate);
+  const result: MutationResult = { changed: true, itemId: id, version: contentVersion(text), unifiedDiff: text.split("\n").map((line) => `+${line}`).join("\n"), affectedItems: [id], diagnostics: [] };
+  if (!dryRun) { await mkdir(directory, { recursive: true }); await writeFile(filePath, text, "utf8"); }
+  return result;
+}
+
+export async function createFolder(repository: ReqlyRepository, options: CreateOptions, dryRun = false): Promise<MutationResult> {
+  const id = await nextId(repository, "folder");
+  const directory = path.join(repository.root, repository.config.roots.folders, id);
+  const filePath = path.join(directory, "index.md");
+  const data: RecordData = {
+    schema: FOLDER_SCHEMA, id, title: options.title, status: "active",
+    relations: [], artifacts: [],
+  };
+  const text = createRecordText(data, folderTemplate);
   const result: MutationResult = { changed: true, itemId: id, version: contentVersion(text), unifiedDiff: text.split("\n").map((line) => `+${line}`).join("\n"), affectedItems: [id], diagnostics: [] };
   if (!dryRun) { await mkdir(directory, { recursive: true }); await writeFile(filePath, text, "utf8"); }
   return result;
@@ -294,7 +312,7 @@ async function removableArtifactPath(repository: ReqlyRepository, record: Return
 export async function setStatus(repository: ReqlyRepository, id: string, status: string, expectedVersion?: string, dryRun = false): Promise<MutationResult> {
   const record = repository.get(id);
   if (expectedVersion && expectedVersion !== record.version) throw new ReqlyError("VERSION_CONFLICT", `${id} changed since it was read.`, { expectedVersion, actualVersion: record.version });
-  const statuses: readonly string[] = record.type === "requirement" ? repository.config.requirements.statuses : repository.config.verifications.statuses;
+  const statuses: readonly string[] = record.type === "requirement" ? repository.config.requirements.statuses : record.type === "verification" ? repository.config.verifications.statuses : repository.config.folders.statuses;
   if (!statuses.includes(status)) throw new ReqlyError("INVALID_STATUS", `Unknown ${record.type} status ${status}.`);
   const data = structuredClone(record.data) as RecordData;
   data.status = status;

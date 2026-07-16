@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { initRepository, createItem, createVerification, deleteItem, setStatus, setRelation, setArtifact, updateItem, acknowledgeImpact, acknowledgeImpacts, checkAiGuide, syncAiGuide } from "./mutations.js";
+import { initRepository, createFolder, createItem, createVerification, deleteItem, setStatus, setRelation, setArtifact, updateItem, acknowledgeImpact, acknowledgeImpacts, checkAiGuide, syncAiGuide } from "./mutations.js";
 import { ReqlyRepository } from "./repository.js";
 import { dependencyFingerprint, normativeFingerprint, parseRecord, replaceSections } from "./markdown.js";
 import { validateRepository } from "./validate.js";
@@ -67,6 +67,44 @@ describe("Markdown model", () => {
 });
 
 describe("Status and impact", () => {
+  it("creates organizational folders and propagates descendant checks", async () => {
+    const root = await fixture(); let repository = await ReqlyRepository.open(root);
+    await createFolder(repository, { title: "Powertrain" }); repository = await ReqlyRepository.open(root);
+    const folderBefore = repository.get("FOL-0001");
+    expect(folderBefore.type).toBe("folder");
+    expect(folderBefore.data.schema).toBe("reqly/folder/v1");
+    expect(folderBefore.status).toBe("active");
+    expect(folderBefore.sections.map((section) => section.name)).toEqual(["Notes"]);
+    await createItem(repository, { title: "Torque limit" }); repository = await ReqlyRepository.open(root);
+    await createVerification(repository, { title: "Torque check", status: "pass" }); repository = await ReqlyRepository.open(root);
+    await setRelation(repository, "REQ-0001", "add", { type: "verified-by", target: "VER-0001" }); repository = await ReqlyRepository.open(root);
+    await setRelation(repository, "FOL-0001", "add", { type: "contains", target: "REQ-0001" }); repository = await ReqlyRepository.open(root);
+
+    const folder = repository.get("FOL-0001");
+    expect(folder.data.relations).toContainEqual({ type: "contains", target: "REQ-0001" });
+    expect(repository.get("REQ-0001").data.relations).toContainEqual({ type: "contained-by", target: "FOL-0001" });
+    expect(normativeFingerprint(folder, repository.config.relations)).toBe(normativeFingerprint(folderBefore, repository.config.relations));
+    expect(repository.hierarchyChildren("FOL-0001").map((record) => record.data.id)).toEqual(["REQ-0001"]);
+    expect(repository.hasHierarchyParent(repository.get("REQ-0001"))).toBe(true);
+    expect(repository.verificationState("FOL-0001")).toBe(true);
+    expect((await validateRepository(repository)).diagnostics).toEqual([]);
+
+    await setStatus(repository, "VER-0001", "fail"); repository = await ReqlyRepository.open(root);
+    const validation = await validateRepository(repository);
+    expect(repository.verificationState("FOL-0001")).toBe(false);
+    expect(validation.statuses.find((item) => item.id === "FOL-0001")?.health).toContain("upstream-update-pending");
+  });
+
+  it("detects cycles between nested organizational folders", async () => {
+    const root = await fixture(); let repository = await ReqlyRepository.open(root);
+    await createFolder(repository, { title: "First" }); repository = await ReqlyRepository.open(root);
+    await createFolder(repository, { title: "Second" }); repository = await ReqlyRepository.open(root);
+    await setRelation(repository, "FOL-0001", "add", { type: "contains", target: "FOL-0002" }); repository = await ReqlyRepository.open(root);
+    expect((await validateRepository(repository)).diagnostics).toEqual([]);
+    await setRelation(repository, "FOL-0002", "add", { type: "contains", target: "FOL-0001" }); repository = await ReqlyRepository.open(root);
+    expect((await validateRepository(repository)).diagnostics).toContainEqual(expect.objectContaining({ code: "RELATION_CYCLE" }));
+  });
+
   it("tracks parent fingerprints and supports acknowledgment", async () => {
     const root = await fixture();
     let repository = await ReqlyRepository.open(root);

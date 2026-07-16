@@ -5,6 +5,7 @@ import {
   ReqlyRepository,
   acknowledgeImpact,
   acknowledgeImpacts,
+  createFolder,
   createItem,
   createVerification,
   deleteItem,
@@ -17,7 +18,6 @@ import {
   type Diagnostic,
   type ItemType,
   type ItemStatus,
-  type Relation,
   type ReqlyRecord,
 } from "@mrpatpat/reqly-core";
 
@@ -27,9 +27,9 @@ type ItemColor = "green" | "red" | "blue";
 class ItemNode extends vscode.TreeItem {
   constructor(public readonly record: ReqlyRecord, health: string[] = [], verified?: boolean, color?: ItemColor, public readonly lineage: string[] = [], collapsible = false) {
     super(record.data.title, collapsible ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
-    const verificationLabel = record.type === "requirement" ? verified === true ? "verified" : verified === false ? "failed" : "verification incomplete" : "";
+    const verificationLabel = record.type !== "verification" ? verified === true ? "checks passed" : verified === false ? "checks failed" : "checks incomplete" : "";
     this.tooltip = `${record.data.id}\n${record.data.title}\n${record.status}${verificationLabel ? ` · ${verificationLabel}` : ""}${health.length ? ` · ${health.join(", ")}` : ""}`;
-    this.contextValue = record.type === "requirement" ? "reqlyRequirement" : "reqlyItem";
+    this.contextValue = record.type === "requirement" ? "reqlyRequirement" : record.type === "folder" ? "reqlyFolder" : "reqlyItem";
     this.iconPath = itemIcon(record, color ?? ownItemColor(record, verified));
     this.command = { command: "reqly.openItemPreview", title: "Open Item", arguments: [this] };
   }
@@ -37,13 +37,13 @@ class ItemNode extends vscode.TreeItem {
 
 function ownItemColor(record: ReqlyRecord, verified?: boolean): ItemColor {
   if (record.type === "verification") return record.status === "pass" ? "green" : record.status === "fail" ? "red" : "blue";
-  if (record.status === "draft") return verified === true ? "green" : verified === false ? "red" : "blue";
   return verified === true ? "green" : verified === false ? "red" : "blue";
 }
 
 function itemIcon(record: ReqlyRecord, color: ItemColor): vscode.ThemeIcon {
   const colorId = color === "green" ? "testing.iconPassed" : color === "red" ? "testing.iconFailed" : "charts.blue";
   if (record.type === "verification") return record.status === "pass" ? new vscode.ThemeIcon("check", new vscode.ThemeColor("testing.iconPassed")) : record.status === "fail" ? new vscode.ThemeIcon("close", new vscode.ThemeColor("testing.iconFailed")) : new vscode.ThemeIcon("symbol-interface");
+  if (record.type === "folder") return new vscode.ThemeIcon("folder", new vscode.ThemeColor(colorId));
   return new vscode.ThemeIcon(record.status === "draft" ? "edit" : "file", new vscode.ThemeColor(colorId));
 }
 
@@ -69,21 +69,9 @@ class RequirementsProvider implements vscode.TreeDataProvider<ItemNode> {
     if (!this.repository) return [];
     const repository = this.repository;
     const records = [...this.repository.records.values()];
-    const isHierarchyRelation = (relation: Relation) => repository.config.relations[relation.type]?.acyclic === true;
-    const childrenOf = (id: string) => {
-      const parent = repository.records.get(id);
-      const requirementChildren = records.filter((record) => record.type === "requirement" && (record.data.relations ?? []).some((relation) => isHierarchyRelation(relation) && relation.target === id));
-      const verificationChildren = parent?.type === "requirement" ? (parent.data.relations ?? []).flatMap((relation) => {
-        const definition = repository.config.relations[relation.type]; const target = repository.records.get(relation.target);
-        return definition?.source === "requirement" && definition.target === "verification" && target ? [target] : [];
-      }) : [];
-      return [...requirementChildren, ...verificationChildren];
-    };
-    const hasTreeParent = (record: ReqlyRecord) => record.type === "requirement"
-      ? (record.data.relations ?? []).some((relation) => isHierarchyRelation(relation) && repository.records.has(relation.target))
-      : records.some((candidate) => candidate.type === "requirement" && (candidate.data.relations ?? []).some((relation) => repository.config.relations[relation.type]?.target === "verification" && relation.target === record.data.id));
+    const childrenOf = (id: string) => repository.hierarchyChildren(id);
     const colorFor = (record: ReqlyRecord, visiting = new Set<string>()): ItemColor => {
-      const own = ownItemColor(record, record.type === "requirement" ? repository.verificationState(record.data.id) : undefined);
+      const own = ownItemColor(record, record.type !== "verification" ? repository.verificationState(record.data.id) : undefined);
       if (visiting.has(record.data.id)) return own;
       const childColors = childrenOf(record.data.id).map((child) => colorFor(child, new Set(visiting).add(record.data.id)));
       if (childColors.includes("blue")) return "blue";
@@ -96,7 +84,7 @@ class RequirementsProvider implements vscode.TreeDataProvider<ItemNode> {
       candidates = childrenOf(element.record.data.id).filter((record) => !lineage.includes(record.data.id));
     } else {
       lineage = [];
-      const roots = records.filter((record) => !hasTreeParent(record));
+      const roots = records.filter((record) => !repository.hasHierarchyParent(record));
       const reachable = new Set<string>(); const queue = roots.map((record) => record.data.id);
       while (queue.length) { const id = queue.shift()!; if (reachable.has(id)) continue; reachable.add(id); queue.push(...childrenOf(id).map((record) => record.data.id)); }
       candidates = [...roots, ...records.filter((record) => !reachable.has(record.data.id))];
@@ -125,10 +113,10 @@ class ReqlyCodeLensProvider implements vscode.CodeLensProvider {
     if (!record) return [];
     const range = new vscode.Range(0, 0, 0, 0);
     const status = this.state.statuses.get(record.data.id);
-    const verified = record.type === "requirement" ? this.state.repository?.verificationState(record.data.id) : undefined;
+    const verified = record.type !== "verification" ? this.state.repository?.verificationState(record.data.id) : undefined;
     return [
-      new vscode.CodeLens(range, { title: `Status: ${record.status} · ${(status?.health ?? ["clean"]).join(", ")}`, command: "reqly.setStatus", arguments: [record.data.id] }),
-      ...(record.type === "requirement" ? [new vscode.CodeLens(range, { title: `Verified: ${verified === true ? "yes" : verified === false ? "no" : "incomplete"}`, command: "reqly.manageRelations", arguments: [record.data.id] })] : []),
+      ...(record.type === "folder" ? [new vscode.CodeLens(range, { title: `Folder · ${(status?.health ?? ["clean"]).join(", ")}`, command: "reqly.manageRelations", arguments: [record.data.id] })] : [new vscode.CodeLens(range, { title: `Status: ${record.status} · ${(status?.health ?? ["clean"]).join(", ")}`, command: "reqly.setStatus", arguments: [record.data.id] })]),
+      ...(record.type !== "verification" ? [new vscode.CodeLens(range, { title: `Checks: ${verified === true ? "passed" : verified === false ? "failed" : "incomplete"}`, command: "reqly.manageRelations", arguments: [record.data.id] })] : []),
       new vscode.CodeLens(range, { title: `Relations: ${(record.data.relations ?? []).length} · Manage`, command: "reqly.manageRelations", arguments: [record.data.id] }),
       new vscode.CodeLens(range, { title: `Artifacts: ${(record.data.artifacts ?? []).length} · Manage`, command: "reqly.manageArtifacts", arguments: [record.data.id] }),
       new vscode.CodeLens(range, { title: "Open Markdown Preview", command: "reqly.previewItem", arguments: [new ItemNode(record)] }),
@@ -198,18 +186,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const requirements = new RequirementsProvider(); const impacts = new ImpactsProvider(); const collection = vscode.languages.createDiagnosticCollection("reqly");
   const state = new ExtensionState(requirements, impacts, collection);
   context.subscriptions.push(collection, vscode.window.registerTreeDataProvider("reqly.requirements", requirements), vscode.window.registerTreeDataProvider("reqly.impacts", impacts));
-  context.subscriptions.push(vscode.languages.registerCodeLensProvider({ language: "markdown", pattern: "**/{requirements,verifications}/**/index.md" }, new ReqlyCodeLensProvider(state)));
+  context.subscriptions.push(vscode.languages.registerCodeLensProvider({ language: "markdown", pattern: "**/{requirements,verifications,folders}/**/index.md" }, new ReqlyCodeLensProvider(state)));
 
   context.subscriptions.push(vscode.languages.registerDefinitionProvider("markdown", {
     provideDefinition(document, position) {
-      const range = document.getWordRangeAtPosition(position, /(?:REQ|VER)-\d+/); const id = range ? document.getText(range) : undefined;
+      const range = document.getWordRangeAtPosition(position, /(?:REQ|VER|FOL)-\d+/); const id = range ? document.getText(range) : undefined;
       const target = id ? state.repository?.records.get(id) : undefined;
       return target ? new vscode.Location(vscode.Uri.file(target.filePath), new vscode.Position(0, 0)) : undefined;
     },
   }));
   context.subscriptions.push(vscode.languages.registerHoverProvider("markdown", {
     provideHover(document, position) {
-      const range = document.getWordRangeAtPosition(position, /(?:REQ|VER)-\d+/); const target = range ? state.repository?.records.get(document.getText(range)) : undefined;
+      const range = document.getWordRangeAtPosition(position, /(?:REQ|VER|FOL)-\d+/); const target = range ? state.repository?.records.get(document.getText(range)) : undefined;
       return target ? new vscode.Hover(`**${target.data.id}: ${target.data.title}**\n\nStatus: ${target.status}`) : undefined;
     },
   }));
@@ -224,6 +212,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("reqly.refresh", () => state.refresh());
   register("reqly.init", async () => { const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; if (!root) return; await initRepository(root); await state.refresh(); });
   register("reqly.newRequirement", async () => createFromUi(state));
+  register("reqly.newFolder", async () => createFolderFromUi(state));
+  register("reqly.addFolderItem", async (node: ItemNode | string) => addFolderItemFromUi(state, node));
   register("reqly.newSubRequirement", async (node: ItemNode | string) => createSubRequirementFromUi(state, node));
   register("reqly.newVerification", async (node?: ItemNode | string) => node ? createVerificationForUi(state, node) : createVerificationFromUi(state));
   register("reqly.openItem", (node: ItemNode | ImpactNode | string) => openItem(state, node));
@@ -283,6 +273,11 @@ async function createVerificationFromUi(state: ExtensionState): Promise<void> {
   if (itemId) await openItem(state, itemId);
 }
 
+async function createFolderFromUi(state: ExtensionState): Promise<void> {
+  const itemId = await promptCreateItem(state, "folder"); await state.refresh();
+  if (itemId) await openItem(state, itemId);
+}
+
 async function createVerificationForUi(state: ExtensionState, value: ItemNode | string): Promise<void> {
   if (!state.repository) return;
   const parent = resolveRecord(state, value);
@@ -302,12 +297,14 @@ async function promptCreateItem(state: ExtensionState, type: ItemType): Promise<
   const title = await vscode.window.showInputBox({ title: `New ${type}`, prompt: type === "verification" ? "Procedure title" : "Title", validateInput: (value) => value.trim() ? undefined : "A title is required." });
   if (!title) return;
   if (type === "requirement") return (await createItem(state.repository, { title })).itemId;
+  if (type === "folder") return (await createFolder(state.repository, { title })).itemId;
   const status = await vscode.window.showQuickPick(["pass", "fail"] as const, { title: "Verification result", placeHolder: "Select the current result" }); if (!status) return;
   return (await createVerification(state.repository, { title, status: status as "pass" | "fail" })).itemId;
 }
 
 async function setStatusFromUi(state: ExtensionState, value: ItemNode | ImpactNode | string): Promise<void> {
   if (!state.repository) return; const record = resolveRecord(state, value); if (!record || !await ensureSaved(record)) return;
+  if (record.type === "folder") return;
   const statuses: readonly string[] = record.type === "requirement" ? state.repository.config.requirements.statuses : state.repository.config.verifications.statuses;
   const selected = await vscode.window.showQuickPick(statuses.filter((status) => status !== record.status), { title: `Status · ${record.data.id}`, placeHolder: `Current status: ${record.status}` }); if (!selected) return;
   await setStatus(state.repository, record.data.id, selected, record.version); await state.refresh();
@@ -333,12 +330,19 @@ async function manageRelationsFromUi(state: ExtensionState, value: ItemNode | Im
   await state.refresh();
 }
 
-async function addRelationFromUi(state: ExtensionState, record: ReqlyRecord): Promise<void> {
+async function addFolderItemFromUi(state: ExtensionState, value: ItemNode | string): Promise<void> {
   if (!state.repository) return;
-  const type = await vscode.window.showQuickPick(Object.entries(state.repository.config.relations).filter(([, definition]) => definition.source === "any" || definition.source === record.type).map(([label]) => label), { title: `Add relation · ${record.data.id}`, placeHolder: "Relation type" }); if (!type) return;
+  const folder = resolveRecord(state, value);
+  if (!folder || folder.type !== "folder" || !await ensureSaved(folder)) return;
+  await addRelationFromUi(state, folder, "contains");
+}
+
+async function addRelationFromUi(state: ExtensionState, record: ReqlyRecord, fixedType?: string): Promise<void> {
+  if (!state.repository) return;
+  const type = fixedType ?? await vscode.window.showQuickPick(Object.entries(state.repository.config.relations).filter(([, definition]) => definition.source === "any" || definition.source === record.type).map(([label]) => label), { title: `Add relation · ${record.data.id}`, placeHolder: "Relation type" }); if (!type) return;
   const definition = state.repository.config.relations[type]!;
   const targets = [...state.repository.records.values()].filter((candidate) => candidate.data.id !== record.data.id && (definition.target === "any" || definition.target === candidate.type));
-  const newTypes: ItemType[] = definition.target === "any" ? ["requirement", "verification"] : [definition.target];
+  const newTypes: ItemType[] = definition.target === "any" ? ["requirement", "verification", "folder"] : [definition.target];
   const target = await vscode.window.showQuickPick([
     ...newTypes.map((itemType) => ({ label: `$(add) Create new ${itemType}`, description: "Create it and add this relation", action: "new" as const, itemType })),
     ...targets.map((candidate) => ({ label: candidate.data.id, description: `${candidate.status} · ${candidate.data.title}`, action: "existing" as const, targetId: candidate.data.id })),
@@ -451,9 +455,7 @@ function subtreeItemIds(repository: ReqlyRepository, rootId: string): Set<string
     const id = queue.shift()!;
     if (selected.has(id)) continue;
     selected.add(id);
-    for (const record of repository.records.values()) {
-      if (record.type === "requirement" && (record.data.relations ?? []).some((relation) => repository.config.relations[relation.type]?.acyclic === true && relation.target === id)) queue.push(record.data.id);
-    }
+    queue.push(...repository.hierarchyChildren(id).map((record) => record.data.id));
   }
   return selected;
 }
