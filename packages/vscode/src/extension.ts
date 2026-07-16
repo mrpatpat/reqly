@@ -31,7 +31,7 @@ class ItemNode extends vscode.TreeItem {
     this.tooltip = `${record.data.id}\n${record.data.title}\n${record.status}${verificationLabel ? ` · ${verificationLabel}` : ""}${health.length ? ` · ${health.join(", ")}` : ""}`;
     this.contextValue = record.type === "requirement" ? "reqlyRequirement" : "reqlyItem";
     this.iconPath = itemIcon(record, color ?? ownItemColor(record, verified));
-    this.command = { command: "reqly.openItem", title: "Open Item", arguments: [this] };
+    this.command = { command: "reqly.openItemPreview", title: "Open Item", arguments: [this] };
   }
 }
 
@@ -54,7 +54,7 @@ class ImpactNode extends vscode.TreeItem {
     this.tooltip = entry.relatedId ? `${entry.message}\nRelated item: ${entry.relatedId}` : entry.message;
     this.contextValue = entry.relatedId ? "reqlyImpactAcknowledgeable" : "reqlyImpact";
     this.iconPath = new vscode.ThemeIcon("warning", new vscode.ThemeColor("list.warningForeground"));
-    this.command = { command: "reqly.openItem", title: "Open Requirement", arguments: [this] };
+    this.command = { command: "reqly.openItemPreview", title: "Open Requirement", arguments: [this] };
   }
 }
 
@@ -227,6 +227,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("reqly.newSubRequirement", async (node: ItemNode | string) => createSubRequirementFromUi(state, node));
   register("reqly.newVerification", async (node?: ItemNode | string) => node ? createVerificationForUi(state, node) : createVerificationFromUi(state));
   register("reqly.openItem", (node: ItemNode | ImpactNode | string) => openItem(state, node));
+  register("reqly.openItemPreview", (node: ItemNode | ImpactNode | string) => openItem(state, node, true));
   register("reqly.previewItem", async (node: ItemNode | ImpactNode | string) => { const record = resolveRecord(state, node); if (record) await vscode.commands.executeCommand("markdown.showPreviewToSide", vscode.Uri.file(record.filePath)); });
   register("reqly.validate", async () => { await state.refresh(); const errors = state.diagnostics.filter((item) => item.severity === "error").length; const warnings = state.diagnostics.filter((item) => item.severity === "warning").length; void vscode.window.showInformationMessage(`Reqly: ${errors} error(s), ${warnings} warning(s).`); });
   register("reqly.setStatus", async (node: ItemNode | ImpactNode | string) => setStatusFromUi(state, node));
@@ -251,8 +252,8 @@ function resolveRecord(state: ExtensionState, value: ItemNode | ImpactNode | str
   return value?.entry.record;
 }
 
-async function openItem(state: ExtensionState, value: ItemNode | ImpactNode | string): Promise<void> {
-  const record = resolveRecord(state, value); if (record) await vscode.window.showTextDocument(vscode.Uri.file(record.filePath), { preview: false });
+async function openItem(state: ExtensionState, value: ItemNode | ImpactNode | string, preview = false): Promise<void> {
+  const record = resolveRecord(state, value); if (record) await vscode.window.showTextDocument(vscode.Uri.file(record.filePath), { preview });
 }
 
 async function createFromUi(state: ExtensionState): Promise<void> {

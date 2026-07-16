@@ -60,6 +60,7 @@
       { "command": "reqly.newVerification", "title": "Reqly: New Verification" },
       { "command": "reqly.validate", "title": "Reqly: Validate Project" },
       { "command": "reqly.openItem", "title": "Reqly: Open Item" },
+      { "command": "reqly.openItemPreview", "title": "Reqly: Open Item in Preview" },
       { "command": "reqly.previewItem", "title": "Reqly: Preview Markdown" },
       { "command": "reqly.setStatus", "title": "Reqly: Change Status" },
       { "command": "reqly.manageRelations", "title": "Reqly: Manage Relations" },
