@@ -65,17 +65,21 @@
       { "command": "reqly.manageRelations", "title": "Reqly: Manage Relations" },
       { "command": "reqly.manageArtifacts", "title": "Reqly: Manage Artifacts" },
       { "command": "reqly.deleteItem", "title": "Reqly: Delete Item" },
-      { "command": "reqly.acknowledgeImpact", "title": "Reqly: Acknowledge Related Change" }
+      { "command": "reqly.acknowledgeImpact", "title": "Reqly: Acknowledge Related Change" },
+      { "command": "reqly.acknowledgeAllImpacts", "title": "Reqly: Acknowledge All Fingerprint Changes", "icon": "$(check-all)" },
+      { "command": "reqly.acknowledgeSubtreeImpacts", "title": "Reqly: Acknowledge Fingerprint Changes in Subtree" }
     ],
     "menus": {
       "view/title": [
         { "command": "reqly.newRequirement", "when": "view == reqly.requirements", "group": "navigation" },
         { "command": "reqly.newVerification", "when": "view == reqly.requirements", "group": "navigation" },
+        { "command": "reqly.acknowledgeAllImpacts", "when": "view == reqly.impacts", "group": "navigation" },
         { "command": "reqly.refresh", "when": "view =~ /reqly\\./", "group": "navigation" }
       ],
       "view/item/context": [
         { "command": "reqly.newSubRequirement", "when": "viewItem == reqlyRequirement", "group": "reqly@1" },
         { "command": "reqly.newVerification", "when": "viewItem == reqlyRequirement", "group": "reqly@2" },
+        { "command": "reqly.acknowledgeSubtreeImpacts", "when": "viewItem == reqlyRequirement", "group": "reqly@3" },
         { "command": "reqly.previewItem", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "inline" },
         { "command": "reqly.setStatus", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
         { "command": "reqly.manageRelations", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },

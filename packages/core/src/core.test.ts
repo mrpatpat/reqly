@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { initRepository, createItem, createVerification, deleteItem, setStatus, setRelation, setArtifact, updateItem, acknowledgeImpact, checkAiGuide, syncAiGuide } from "./mutations.js";
+import { initRepository, createItem, createVerification, deleteItem, setStatus, setRelation, setArtifact, updateItem, acknowledgeImpact, acknowledgeImpacts, checkAiGuide, syncAiGuide } from "./mutations.js";
 import { ReqlyRepository } from "./repository.js";
 import { dependencyFingerprint, normativeFingerprint, parseRecord, replaceSections } from "./markdown.js";
 import { validateRepository } from "./validate.js";
@@ -96,6 +96,30 @@ describe("Status and impact", () => {
     expect(repository.get("REQ-0001").data.relations?.find((relation) => relation.type === "requires")?.fingerprint).toBeUndefined();
     expect(repository.get("REQ-0002").data.relations?.find((relation) => relation.type === "required-by")?.fingerprint).toBe(`sha256:${dependencyFingerprint(repository.get("REQ-0001"), repository.config.relations)}`);
     expect((await validateRepository(repository)).diagnostics.filter((item) => item.severity === "error")).toEqual([]);
+  });
+
+  it("acknowledges every stale fingerprint for selected items", async () => {
+    const root = await fixture(); let repository = await ReqlyRepository.open(root);
+    await createItem(repository, { title: "Parent" }); repository = await ReqlyRepository.open(root);
+    await createItem(repository, { title: "Selected child" }); repository = await ReqlyRepository.open(root);
+    await createItem(repository, { title: "Unselected child" }); repository = await ReqlyRepository.open(root);
+    await createVerification(repository, { title: "Selected check", status: "pass" }); repository = await ReqlyRepository.open(root);
+    await setRelation(repository, "REQ-0002", "add", { type: "required-by", target: "REQ-0001" }); repository = await ReqlyRepository.open(root);
+    await setRelation(repository, "REQ-0002", "add", { type: "verified-by", target: "VER-0001" }); repository = await ReqlyRepository.open(root);
+    await setRelation(repository, "REQ-0003", "add", { type: "required-by", target: "REQ-0001" }); repository = await ReqlyRepository.open(root);
+    await updateItem(repository, "REQ-0001", { bodySections: { Requirement: "Changed parent content." } }); repository = await ReqlyRepository.open(root);
+    await setStatus(repository, "VER-0001", "fail"); repository = await ReqlyRepository.open(root);
+
+    const result = await acknowledgeImpacts(repository, ["REQ-0002"]);
+    expect(result.affectedItems).toEqual(["REQ-0002"]);
+    repository = await ReqlyRepository.open(root);
+    const diagnostics = (await validateRepository(repository)).diagnostics;
+    expect(diagnostics.some((item) => item.itemId === "REQ-0002" && ["PARENT_UPDATE_PENDING", "VERIFICATION_UPDATE_PENDING"].includes(item.code))).toBe(false);
+    expect(diagnostics).toContainEqual(expect.objectContaining({ code: "PARENT_UPDATE_PENDING", itemId: "REQ-0003" }));
+
+    await acknowledgeImpacts(repository);
+    repository = await ReqlyRepository.open(root);
+    expect((await validateRepository(repository)).diagnostics.some((item) => ["PARENT_UPDATE_PENDING", "VERIFICATION_UPDATE_PENDING"].includes(item.code))).toBe(false);
   });
 
   it("adds and removes inverse relations from either direction", async () => {

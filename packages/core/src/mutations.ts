@@ -309,6 +309,28 @@ export async function acknowledgeImpact(repository: ReqlyRepository, itemId: str
   return setRelation(repository, itemId, "update", { type: relation.type, target: relation.target }, expectedVersion, dryRun);
 }
 
+export async function acknowledgeImpacts(repository: ReqlyRepository, itemIds?: Iterable<string>, dryRun = false): Promise<MutationResult> {
+  const selected = itemIds ? new Set(itemIds) : undefined;
+  const changes: Array<{ record: ReturnType<ReqlyRepository["get"]>; data: RecordData; body: string }> = [];
+  for (const record of repository.records.values()) {
+    if (selected && !selected.has(record.data.id)) continue;
+    let changed = false;
+    const data = structuredClone(record.data) as RecordData;
+    data.relations = (data.relations ?? []).map((relation) => {
+      const definition = repository.config.relations[relation.type];
+      const target = repository.records.get(relation.target);
+      if (!definition?.propagatesImpact || relation.fingerprint === undefined || !target) return relation;
+      const fingerprint = `sha256:${dependencyFingerprint(target, repository.config.relations)}`;
+      if (relation.fingerprint === fingerprint) return relation;
+      changed = true;
+      return { ...relation, fingerprint };
+    });
+    if (changed) changes.push({ record, data, body: record.body });
+  }
+  if (!changes.length) return { changed: false, unifiedDiff: "", affectedItems: [], diagnostics: [] };
+  return writeRecordUpdates(repository, changes, changes[0]!.record.data.id, dryRun);
+}
+
 export async function renumberItem(repository: ReqlyRepository, oldId: string, newId: string, dryRun = false): Promise<MutationResult> {
   if (repository.records.has(newId)) throw new ReqlyError("DUPLICATE_ID", `${newId} already exists.`);
   const source = repository.get(oldId);

@@ -4,6 +4,7 @@ import {
   ReqlyError,
   ReqlyRepository,
   acknowledgeImpact,
+  acknowledgeImpacts,
   createItem,
   createVerification,
   deleteItem,
@@ -233,6 +234,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   register("reqly.manageArtifacts", async (node: ItemNode | ImpactNode | string) => manageArtifactsFromUi(state, node));
   register("reqly.deleteItem", async (node: ItemNode | ImpactNode | string) => deleteItemFromUi(state, node));
   register("reqly.acknowledgeImpact", async (node: ImpactNode) => acknowledgeFromUi(state, node));
+  register("reqly.acknowledgeAllImpacts", async () => acknowledgeManyFromUi(state));
+  register("reqly.acknowledgeSubtreeImpacts", async (node: ItemNode | string) => acknowledgeManyFromUi(state, node));
 
   const watcher = vscode.workspace.createFileSystemWatcher("**/{.reqly,requirements}/**/*");
   let timer: NodeJS.Timeout | undefined; const changed = new Map<string, vscode.Uri>();
@@ -435,6 +438,40 @@ async function acknowledgeFromUi(state: ExtensionState, node: ImpactNode): Promi
   const confirmation = await vscode.window.showWarningMessage(`Acknowledge ${node.entry.relatedId} for ${node.entry.record.data.id}?`, { modal: true }, "Acknowledge");
   if (confirmation !== "Acknowledge") return;
   await acknowledgeImpact(state.repository, node.entry.record.data.id, node.entry.relatedId, node.entry.record.version); await state.refresh();
+}
+
+function fingerprintImpactItemIds(state: ExtensionState): Set<string> {
+  return new Set(state.diagnostics.filter((item) => ["PARENT_UPDATE_PENDING", "VERIFICATION_UPDATE_PENDING"].includes(item.code) && item.itemId).map((item) => item.itemId!));
+}
+
+function subtreeItemIds(repository: ReqlyRepository, rootId: string): Set<string> {
+  const selected = new Set<string>(); const queue = [rootId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (selected.has(id)) continue;
+    selected.add(id);
+    for (const record of repository.records.values()) {
+      if (record.type === "requirement" && (record.data.relations ?? []).some((relation) => repository.config.relations[relation.type]?.acyclic === true && relation.target === id)) queue.push(record.data.id);
+    }
+  }
+  return selected;
+}
+
+async function acknowledgeManyFromUi(state: ExtensionState, value?: ItemNode | string): Promise<void> {
+  if (!state.repository) return;
+  const root = value ? resolveRecord(state, value) : undefined;
+  if (value && (!root || root.type !== "requirement")) return;
+  const pending = fingerprintImpactItemIds(state);
+  const scope = root ? subtreeItemIds(state.repository, root.data.id) : new Set(state.repository.records.keys());
+  const itemIds = new Set([...pending].filter((id) => scope.has(id)));
+  if (!itemIds.size) { void vscode.window.showInformationMessage("Reqly: No fingerprint changes to acknowledge."); return; }
+  const records = [...itemIds].map((id) => state.repository!.get(id));
+  if (records.some((record) => !ensureSaved(record))) return;
+  const checkCount = state.diagnostics.filter((item) => item.itemId && itemIds.has(item.itemId) && ["PARENT_UPDATE_PENDING", "VERIFICATION_UPDATE_PENDING"].includes(item.code)).length;
+  const label = root ? `${root.data.id} and its descendants` : "the impact queue";
+  const confirmation = await vscode.window.showWarningMessage(`Acknowledge ${checkCount} fingerprint change${checkCount === 1 ? "" : "s"} across ${itemIds.size} item${itemIds.size === 1 ? "" : "s"} in ${label}?`, { modal: true }, "Acknowledge All");
+  if (confirmation !== "Acknowledge All") return;
+  await acknowledgeImpacts(state.repository, itemIds); await state.refresh();
 }
 
 export function deactivate(): void {}
