@@ -42,9 +42,9 @@ Reqly can copy a local file into the item's `artifacts/` folder or link a relati
 
 Create a child requirement, such as "Display the warning below 10% capacity", and relate it to `REQ-0001` with `required-by`. Reqly maintains the parent's inverse `requires` relation automatically.
 
-Now the Requirements view shows the product requirement as a parent-first tree. The same view also places linked verifications beneath their requirements.
+Now the Requirements view shows the product requirement as a parent-first tree. The same view also places linked verifications beneath their requirements. Use its search action to filter requirements and verifications by partial text; separate search terms use AND logic, and matching paths open automatically.
 
-For purely visual organization, create a folder and use its `contains` relation to place requirements, verifications, or nested folders beneath it. Folder relations are non-normative: rearranging the tree does not change requirement fingerprints. A folder's icon color and check state are derived from the items it contains.
+For purely visual organization, create a folder from the Requirements view root, or use the requirement context menu to create one and place that requirement in it immediately. Folder relations are non-normative: rearranging the tree does not change requirement fingerprints. A folder's icon color and check state are derived from the items it contains.
 
 ### 5. Add evidence
 
@@ -72,7 +72,7 @@ The verification document contains `Procedure`, `Expected Result`, and `Evidence
 
 Later, the battery specification changes. Edit the parent requirement or its linked normative data. Reqly detects that the child or verification was based on an older dependency fingerprint and puts it in the impact queue.
 
-Review the affected items, update the requirement or repeat the test, then acknowledge the impact. Reqly refreshes the fingerprint. The Impact Queue toolbar can acknowledge all pending fingerprint changes at once, while a requirement's context menu can acknowledge its own subtree. Draft-parent, broken-reference, and cycle warnings remain until their underlying condition is fixed.
+Review the affected items, update the requirement or repeat the test, then acknowledge the impact. Reqly refreshes the fingerprint. The Impact Queue toolbar can acknowledge all pending fingerprint changes at once, while a requirement's context menu can acknowledge its own subtree. Broken-reference and cycle warnings remain in the queue until their underlying condition is fixed; draft-parent warnings remain available in diagnostics and on the requirement tree.
 
 Selecting items in the Requirements or Impact Queue tree reuses VS Code's preview editor, preventing navigation from leaving a trail of open tabs. Reqly never stages, commits, pushes, or rewrites Git history; use your normal Git workflow to review and commit the Markdown and YAML changes.
 

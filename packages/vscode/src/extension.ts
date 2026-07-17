@@ -63,35 +63,129 @@ class RequirementsProvider implements vscode.TreeDataProvider<ItemNode> {
   readonly onDidChangeTreeData = this.changed.event;
   private repository?: ReqlyRepository;
   private statuses = new Map<string, ItemStatus>();
-  set(repository: ReqlyRepository | undefined, statuses: ItemStatus[] = []): void { this.repository = repository; this.statuses = new Map(statuses.map((status) => [status.id, status])); this.changed.fire(); }
+  private searchTerms: string[] = [];
+  private searchMatches = new Set<string>();
+  private searchVisible = new Set<string>();
+
+  get searchQuery(): string { return this.searchTerms.join(" "); }
+  get searchActive(): boolean { return this.searchTerms.length > 0; }
+
+  set(repository: ReqlyRepository | undefined, statuses: ItemStatus[] = []): void {
+    this.repository = repository;
+    this.statuses = new Map(statuses.map((status) => [status.id, status]));
+    this.rebuildSearch();
+    this.changed.fire();
+  }
+
+  setSearch(query: string): void {
+    this.searchTerms = query.trim().split(/\s+/).filter(Boolean).map((term) => term.toLowerCase());
+    this.rebuildSearch();
+    this.changed.fire();
+  }
+
+  private rebuildSearch(): void {
+    this.searchMatches.clear();
+    this.searchVisible.clear();
+    if (!this.repository || !this.searchTerms.length) return;
+    const records = [...this.repository.records.values()];
+    for (const record of records) {
+      if (record.type === "folder") continue;
+      const text = `${record.data.id} ${record.data.title}`.toLowerCase();
+      if (this.searchTerms.every((term) => text.includes(term))) this.searchMatches.add(record.data.id);
+    }
+    this.searchVisible = new Set(this.searchMatches);
+    const parents = new Map<string, ReqlyRecord[]>();
+    for (const record of records) {
+      for (const child of this.repository.hierarchyChildren(record.data.id)) {
+        const related = parents.get(child.data.id) ?? [];
+        if (!related.some((candidate) => candidate.data.id === record.data.id)) related.push(record);
+        parents.set(child.data.id, related);
+      }
+    }
+    const queue = [...this.searchMatches];
+    while (queue.length) {
+      const id = queue.shift()!;
+      for (const parent of parents.get(id) ?? []) {
+        if (this.searchVisible.has(parent.data.id)) continue;
+        this.searchVisible.add(parent.data.id);
+        queue.push(parent.data.id);
+      }
+    }
+  }
+
+  private isVisible(record: ReqlyRecord): boolean { return !this.searchActive || this.searchVisible.has(record.data.id); }
+  private childrenOf(id: string): ReqlyRecord[] { return this.repository?.hierarchyChildren(id) ?? []; }
+
+  private colorFor(record: ReqlyRecord, visiting = new Set<string>()): ItemColor {
+    const repository = this.repository;
+    if (!repository) return "blue";
+    const own = ownItemColor(record, record.type !== "verification" ? repository.verificationState(record.data.id) : undefined);
+    if (visiting.has(record.data.id)) return own;
+    const childColors = this.childrenOf(record.data.id).map((child) => this.colorFor(child, new Set(visiting).add(record.data.id)));
+    if (childColors.includes("blue")) return "blue";
+    if (childColors.includes("red")) return "red";
+    return childColors.length ? "green" : own;
+  }
+
+  private node(record: ReqlyRecord, lineage: string[]): ItemNode {
+    const children = this.childrenOf(record.data.id);
+    const collapsible = children.some((child) => !lineage.includes(child.data.id) && this.isVisible(child));
+    return new ItemNode(record, (this.statuses.get(record.data.id)?.health ?? []).filter((value) => value !== "clean"), this.repository?.verificationState(record.data.id), this.colorFor(record), lineage, collapsible);
+  }
+
   getTreeItem(item: ItemNode): vscode.TreeItem { return item; }
+
   getChildren(element?: ItemNode): ItemNode[] {
     if (!this.repository) return [];
     const repository = this.repository;
     const records = [...this.repository.records.values()];
-    const childrenOf = (id: string) => repository.hierarchyChildren(id);
-    const colorFor = (record: ReqlyRecord, visiting = new Set<string>()): ItemColor => {
-      const own = ownItemColor(record, record.type !== "verification" ? repository.verificationState(record.data.id) : undefined);
-      if (visiting.has(record.data.id)) return own;
-      const childColors = childrenOf(record.data.id).map((child) => colorFor(child, new Set(visiting).add(record.data.id)));
-      if (childColors.includes("blue")) return "blue";
-      if (childColors.includes("red")) return "red";
-      return childColors.length ? "green" : own;
-    };
     let candidates: ReqlyRecord[]; let lineage: string[];
     if (element) {
       lineage = [...element.lineage, element.record.data.id];
-      candidates = childrenOf(element.record.data.id).filter((record) => !lineage.includes(record.data.id));
+      candidates = this.childrenOf(element.record.data.id).filter((record) => !lineage.includes(record.data.id));
     } else {
       lineage = [];
       const roots = records.filter((record) => !repository.hasHierarchyParent(record));
       const reachable = new Set<string>(); const queue = roots.map((record) => record.data.id);
-      while (queue.length) { const id = queue.shift()!; if (reachable.has(id)) continue; reachable.add(id); queue.push(...childrenOf(id).map((record) => record.data.id)); }
+      while (queue.length) { const id = queue.shift()!; if (reachable.has(id)) continue; reachable.add(id); queue.push(...this.childrenOf(id).map((record) => record.data.id)); }
       candidates = [...roots, ...records.filter((record) => !reachable.has(record.data.id))];
     }
     return [...new Map(candidates.map((record) => [record.data.id, record])).values()]
+      .filter((record) => this.isVisible(record))
       .sort((a, b) => a.data.id.localeCompare(b.data.id))
-      .map((record) => new ItemNode(record, (this.statuses.get(record.data.id)?.health ?? []).filter((value) => value !== "clean"), repository.verificationState(record.data.id), colorFor(record), lineage, childrenOf(record.data.id).some((child) => !lineage.includes(child.data.id))));
+      .map((record) => this.node(record, lineage));
+  }
+
+  getParent(element: ItemNode): ItemNode | undefined {
+    const parentId = element.lineage[element.lineage.length - 1];
+    const parent = parentId ? this.repository?.records.get(parentId) : undefined;
+    return parent ? this.node(parent, element.lineage.slice(0, -1)) : undefined;
+  }
+
+  searchResults(): ItemNode[] {
+    if (!this.repository || !this.searchActive) return [];
+    const results: ItemNode[] = []; const found = new Set<string>(); const visited = new Set<string>();
+    const visit = (nodes: ItemNode[]): void => {
+      for (const node of nodes) {
+        const key = [...node.lineage, node.record.data.id].join("\u0000");
+        if (visited.has(key)) continue;
+        visited.add(key);
+        if (this.searchMatches.has(node.record.data.id) && !found.has(node.record.data.id)) { found.add(node.record.data.id); results.push(node); }
+        if (node.collapsibleState !== vscode.TreeItemCollapsibleState.None) visit(this.getChildren(node));
+      }
+    };
+    visit(this.getChildren());
+    return results;
+  }
+
+  revealPath(element: ItemNode): ItemNode[] {
+    const path = [element]; let current = element;
+    while (current.lineage.length) {
+      const parent = this.getParent(current);
+      if (!parent) break;
+      path.unshift(parent); current = parent;
+    }
+    return path;
   }
 }
 
@@ -99,7 +193,7 @@ class ImpactsProvider implements vscode.TreeDataProvider<ImpactNode> {
   private readonly changed = new vscode.EventEmitter<void>(); readonly onDidChangeTreeData = this.changed.event;
   private entries: ImpactEntry[] = [];
   set(repository: ReqlyRepository | undefined, diagnostics: Diagnostic[]): void {
-    this.entries = repository ? diagnostics.filter((item) => ["PARENT_UPDATE_PENDING", "VERIFICATION_UPDATE_PENDING", "PARENT_DRAFT", "BROKEN_REFERENCE", "RELATION_CYCLE"].includes(item.code) && item.itemId && repository.records.has(item.itemId)).map((item) => ({ record: repository.get(item.itemId!), relatedId: ["PARENT_UPDATE_PENDING", "VERIFICATION_UPDATE_PENDING", "PARENT_DRAFT"].includes(item.code) ? item.relatedId : undefined, message: item.message })) : [];
+    this.entries = repository ? diagnostics.filter((item) => ["PARENT_UPDATE_PENDING", "VERIFICATION_UPDATE_PENDING", "BROKEN_REFERENCE", "RELATION_CYCLE"].includes(item.code) && item.itemId && repository.records.has(item.itemId)).map((item) => ({ record: repository.get(item.itemId!), relatedId: ["PARENT_UPDATE_PENDING", "VERIFICATION_UPDATE_PENDING"].includes(item.code) ? item.relatedId : undefined, message: item.message })) : [];
     this.changed.fire();
   }
   getTreeItem(item: ImpactNode): vscode.TreeItem { return item; }
@@ -185,7 +279,9 @@ class ExtensionState {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const requirements = new RequirementsProvider(); const impacts = new ImpactsProvider(); const collection = vscode.languages.createDiagnosticCollection("reqly");
   const state = new ExtensionState(requirements, impacts, collection);
-  context.subscriptions.push(collection, vscode.window.registerTreeDataProvider("reqly.requirements", requirements), vscode.window.registerTreeDataProvider("reqly.impacts", impacts));
+  const requirementsView = vscode.window.createTreeView("reqly.requirements", { treeDataProvider: requirements, showCollapseAll: true });
+  context.subscriptions.push(collection, requirementsView, vscode.window.registerTreeDataProvider("reqly.impacts", impacts));
+  void vscode.commands.executeCommand("setContext", "reqly.searchActive", false);
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ language: "markdown", pattern: "**/{requirements,verifications,folders}/**/index.md" }, new ReqlyCodeLensProvider(state)));
 
   context.subscriptions.push(vscode.languages.registerDefinitionProvider("markdown", {
@@ -211,8 +307,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const register = (command: string, callback: (...args: any[]) => unknown) => context.subscriptions.push(vscode.commands.registerCommand(command, callback));
   register("reqly.refresh", () => state.refresh());
   register("reqly.init", async () => { const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; if (!root) return; await initRepository(root); await state.refresh(); });
+  register("reqly.search", async () => searchRequirementsFromUi(requirements, requirementsView));
+  register("reqly.clearSearch", async () => clearRequirementsSearch(requirements, requirementsView));
   register("reqly.newRequirement", async () => createFromUi(state));
-  register("reqly.newFolder", async () => createFolderFromUi(state));
+  register("reqly.newFolder", async (node?: ItemNode | string) => createFolderFromUi(state, node));
   register("reqly.addFolderItem", async (node: ItemNode | string) => addFolderItemFromUi(state, node));
   register("reqly.newSubRequirement", async (node: ItemNode | string) => createSubRequirementFromUi(state, node));
   register("reqly.newVerification", async (node?: ItemNode | string) => node ? createVerificationForUi(state, node) : createVerificationFromUi(state));
@@ -246,6 +344,25 @@ async function openItem(state: ExtensionState, value: ItemNode | ImpactNode | st
   const record = resolveRecord(state, value); if (record) await vscode.window.showTextDocument(vscode.Uri.file(record.filePath), { preview });
 }
 
+async function searchRequirementsFromUi(provider: RequirementsProvider, view: vscode.TreeView<ItemNode>): Promise<void> {
+  const query = await vscode.window.showInputBox({ title: "Search Requirements and Verifications", prompt: "Partial matches are supported; spaces mean AND", value: provider.searchQuery });
+  if (query === undefined) return;
+  provider.setSearch(query);
+  view.description = provider.searchActive ? `Search: ${provider.searchQuery}` : undefined;
+  await vscode.commands.executeCommand("setContext", "reqly.searchActive", provider.searchActive);
+  if (!provider.searchActive) return;
+  const results = provider.searchResults();
+  if (!results.length) { void vscode.window.showInformationMessage(`Reqly: No requirements or verifications match "${query.trim()}".`); return; }
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  for (const result of results) for (const node of provider.revealPath(result)) await view.reveal(node, { expand: true, focus: false, select: false });
+}
+
+async function clearRequirementsSearch(provider: RequirementsProvider, view: vscode.TreeView<ItemNode>): Promise<void> {
+  provider.setSearch("");
+  view.description = undefined;
+  await vscode.commands.executeCommand("setContext", "reqly.searchActive", false);
+}
+
 async function createFromUi(state: ExtensionState): Promise<void> {
   const itemId = await promptCreateItem(state, "requirement"); await state.refresh();
   if (itemId) await openItem(state, itemId);
@@ -273,9 +390,21 @@ async function createVerificationFromUi(state: ExtensionState): Promise<void> {
   if (itemId) await openItem(state, itemId);
 }
 
-async function createFolderFromUi(state: ExtensionState): Promise<void> {
-  const itemId = await promptCreateItem(state, "folder"); await state.refresh();
-  if (itemId) await openItem(state, itemId);
+async function createFolderFromUi(state: ExtensionState, value?: ItemNode | string): Promise<void> {
+  if (!state.repository) return;
+  const parent = value ? resolveRecord(state, value) : undefined;
+  if (value && (!parent || parent.type !== "requirement" || !await ensureSaved(parent))) return;
+  const itemId = await promptCreateItem(state, "folder");
+  if (!itemId) return;
+  await state.refresh();
+  if (parent) {
+    const folder = state.repository.records.get(itemId);
+    const currentParent = state.repository.records.get(parent.data.id);
+    if (!folder || !currentParent) return;
+    await setRelation(state.repository, folder.data.id, "add", { type: "contains", target: currentParent.data.id }, folder.version);
+    await state.refresh();
+  }
+  await openItem(state, itemId);
 }
 
 async function createVerificationForUi(state: ExtensionState, value: ItemNode | string): Promise<void> {

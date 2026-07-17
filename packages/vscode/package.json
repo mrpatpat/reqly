@@ -55,6 +55,8 @@
     "commands": [
       { "command": "reqly.init", "title": "Reqly: Initialize Project" },
       { "command": "reqly.refresh", "title": "Reqly: Refresh" },
+      { "command": "reqly.search", "title": "Reqly: Search Requirements", "icon": "$(search)" },
+      { "command": "reqly.clearSearch", "title": "Reqly: Clear Search", "icon": "$(clear-all)" },
       { "command": "reqly.newRequirement", "title": "Reqly: New Requirement" },
       { "command": "reqly.newFolder", "title": "Reqly: New Folder", "icon": "$(new-folder)" },
       { "command": "reqly.addFolderItem", "title": "Reqly: Add Item to Folder" },
@@ -74,6 +76,8 @@
     ],
     "menus": {
       "view/title": [
+        { "command": "reqly.search", "when": "view == reqly.requirements", "group": "navigation" },
+        { "command": "reqly.clearSearch", "when": "view == reqly.requirements && reqly.searchActive", "group": "navigation" },
         { "command": "reqly.newRequirement", "when": "view == reqly.requirements", "group": "navigation" },
         { "command": "reqly.newFolder", "when": "view == reqly.requirements", "group": "navigation" },
         { "command": "reqly.newVerification", "when": "view == reqly.requirements", "group": "navigation" },
@@ -81,9 +85,10 @@
         { "command": "reqly.refresh", "when": "view =~ /reqly\\./", "group": "navigation" }
       ],
       "view/item/context": [
-        { "command": "reqly.newSubRequirement", "when": "viewItem == reqlyRequirement", "group": "reqly@1" },
-        { "command": "reqly.newVerification", "when": "viewItem == reqlyRequirement", "group": "reqly@2" },
-        { "command": "reqly.acknowledgeSubtreeImpacts", "when": "viewItem == reqlyRequirement", "group": "reqly@3" },
+        { "command": "reqly.newFolder", "when": "viewItem == reqlyRequirement", "group": "reqly@1" },
+        { "command": "reqly.newSubRequirement", "when": "viewItem == reqlyRequirement", "group": "reqly@2" },
+        { "command": "reqly.newVerification", "when": "viewItem == reqlyRequirement", "group": "reqly@3" },
+        { "command": "reqly.acknowledgeSubtreeImpacts", "when": "viewItem == reqlyRequirement", "group": "reqly@4" },
         { "command": "reqly.addFolderItem", "when": "viewItem == reqlyFolder", "group": "reqly@1" },
         { "command": "reqly.previewItem", "when": "viewItem =~ /reqly(Folder|Item|Requirement)/", "group": "inline" },
         { "command": "reqly.setStatus", "when": "viewItem =~ /reqly(Item|Requirement)/", "group": "reqly" },
